@@ -1,0 +1,85 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.plugin.compose'
+}
+
+// Release signing comes from keystore.properties next to settings.gradle (never committed):
+//   storeFile=/path/to/peekwell-upload.jks
+//   storePassword=...
+//   keyAlias=peekwell
+//   keyPassword=...
+// Without it, release builds are signed with the debug key: fine for testing, not for publishing.
+def keystoreFile = rootProject.file('keystore.properties')
+def keystore = new Properties()
+if (keystoreFile.exists()) keystoreFile.withInputStream { keystore.load(it) }
+
+android {
+    namespace 'com.bytefoss.peekwell'
+    // 37 for material3 1.5 (Material 3 Expressive); the app still targets 36
+    compileSdk 37
+
+    defaultConfig {
+        applicationId 'com.bytefoss.peekwell'
+        minSdk 26
+        // Google Play requires new apps and updates to target a recent API level
+        targetSdk 36
+        versionCode 1
+        versionName '1.0'
+    }
+
+    signingConfigs {
+        release {
+            if (keystoreFile.exists()) {
+                storeFile file(keystore['storeFile'])
+                storePassword keystore['storePassword']
+                keyAlias keystore['keyAlias']
+                keyPassword keystore['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+            signingConfig keystoreFile.exists() ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        compose true
+    }
+
+    // Unit tests run Onvif and Watcher on the desktop JVM against a fake camera; android.util.Log becomes a no-op
+    testOptions {
+        unitTests.returnDefaultValues = true
+        // the desktop JVM quietly resends a POST the server hung up on; Android doesn't, and the camera's dropped
+        // pulls must reach the watcher the same way in tests as on the TV
+        unitTests.all { systemProperty 'sun.net.http.retryPost', 'false' }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}
+
+dependencies {
+    implementation platform('androidx.compose:compose-bom:2026.09.00')
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.foundation:foundation'
+    // Material 3 Expressive (MaterialExpressiveTheme, button groups, shapes, motion) is new in 1.5
+    implementation 'androidx.compose.material3:material3:1.5.0-rc01'
+    implementation 'androidx.activity:activity-compose:1.13.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.11.0' // video plays only while a screen is started
+    implementation 'androidx.media3:media3-exoplayer:1.4.1'
+    implementation 'androidx.media3:media3-exoplayer-rtsp:1.4.1'
+    testImplementation 'junit:junit:4.13.2'
+}

@@ -1,0 +1,17 @@
+.gradle/
+build/
+app/build/
+local.properties
+keystore.properties
+*.jks
+*.keystore
+*.apk
+*.aab
+.DS_Store
+.kotlin/
+.idea/
+*.iml
+# uiautomator screen dumps hold whatever was on screen, camera logins included
+ui.xml
+# private maintainer notes: signing and release steps
+RELEASING.md
