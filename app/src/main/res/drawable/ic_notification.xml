@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Peekwell's notification icon: the small-size cut of the mark as a white silhouette, as Android requires -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="256" android:viewportHeight="256">
+    <group android:translateX="5" android:translateY="10">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M100 187H50A37 37 0 0 1 13 150V68A37 37 0 0 1 50 31H178A37 37 0 0 1 215 68V104H189V68A11 11 0 0 0 178 57H50A11 11 0 0 0 39 68V150A11 11 0 0 0 50 161H100Z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M140 126H222A18 18 0 0 1 240 144V184A18 18 0 0 1 222 202H140A18 18 0 0 1 122 184V144A18 18 0 0 1 140 126Z" />
+    </group>
+</vector>
