@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copies of AppColors (Theme.kt) for the window, which shows before Compose draws. Keep them in step. -->
+<resources>
+    <color name="background">#FF0F1512</color>
+    <color name="primary">#FF8CD5B4</color>
+</resources>
