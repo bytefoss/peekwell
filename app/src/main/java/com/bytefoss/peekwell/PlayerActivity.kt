@@ -23,6 +23,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,18 +36,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 import kotlinx.coroutines.delay
 
-/** One camera full screen with sound. Left/Right switches camera, Back returns to the grid. */
+/** One camera full screen with sound. OK pauses, Left/Right switches camera, Back returns to the grid. */
 class PlayerActivity : ComponentActivity() {
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -68,20 +71,35 @@ private fun Player(cams: List<Cam>, start: Int) {
     val started by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
-    // the name and what the keys do show for 3 seconds, then fade out: on opening, on switching camera, and on OK
+    // OK and the remote's play/pause keys pause and resume, as TV players do; switching camera plays the new one
+    var isPaused by remember(index) { mutableStateOf(false) }
+    // the screen stays on while the picture plays, and may go to the screensaver while it's paused
+    val view = LocalView.current
+    DisposableEffect(isPaused) {
+        view.keepScreenOn = !isPaused
+        onDispose { view.keepScreenOn = false }
+    }
+    // the name and what the keys do show for 3 seconds, then fade out: on opening, on switching camera, and on
+    // OK; while paused they stay
     val label = remember { Animatable(1f) }
-    var infoRequest by remember { mutableIntStateOf(0) }
-    LaunchedEffect(index, infoRequest) {
+    LaunchedEffect(index, isPaused) {
         label.snapTo(1f)
+        if (isPaused) return@LaunchedEffect
         delay(3000)
         label.animateTo(0f, tween(500))
     }
     Box(
-        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLowest) // the scheme's near-black, round the video
+        Modifier.fillMaxSize().background(Color.Black) // TV players show black round a video that doesn't fill the screen
             .focusRequester(focus).focusable()
             .onKeyEvent { keyEvent ->
-                if (keyEvent.key == Key.DirectionCenter || keyEvent.key == Key.Enter) {
-                    if (keyEvent.type == KeyEventType.KeyUp) infoRequest++
+                val pausedAfterKey = when (keyEvent.key) {
+                    Key.DirectionCenter, Key.Enter, Key.MediaPlayPause -> !isPaused
+                    Key.MediaPlay -> false
+                    Key.MediaPause -> true
+                    else -> null
+                }
+                if (pausedAfterKey != null) {
+                    if (keyEvent.type == KeyEventType.KeyUp) isPaused = pausedAfterKey
                     return@onKeyEvent true
                 }
                 val step = when (keyEvent.key) {
@@ -105,7 +123,7 @@ private fun Player(cams: List<Cam>, start: Int) {
             LiveVideo(
                 cam, hd = true, Modifier.fillMaxSize(), surface = true, muted = false,
                 onFirstFrame = { Log.i("peekwell", "${cam.host}: full screen video in ${SystemClock.elapsedRealtime() - t0} ms") },
-                retryRequest = retryRequest, onFailed = { isVideoFailed = it },
+                retryRequest = retryRequest, onFailed = { isVideoFailed = it }, isPaused = isPaused,
                 failedAction = {
                     Button(
                         onClick = { retryRequest++ }, shapes = ButtonDefaults.shapes(),
@@ -115,8 +133,10 @@ private fun Player(cams: List<Cam>, start: Int) {
                 },
             )
         }
+        val name = if (cams.size > 1) "‹  ${cam.name}  ·  ${index + 1} of ${cams.size}  ›" else cam.name
         StatusLabel(
-            if (cams.size > 1) "‹  ${cam.name}  ·  ${index + 1} of ${cams.size}  ›" else cam.name, MaterialTheme.colorScheme.primary,
+            if (isPaused) "$name  ·  Paused" else name,
+            if (isPaused) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
             Modifier.align(Alignment.TopStart).padding(48.dp).alpha(label.value),
         )
         // straight on the video, inside the TV's safe area; KeyHint's shadow keeps it readable on a bright picture
@@ -124,6 +144,7 @@ private fun Player(cams: List<Cam>, start: Int) {
             Modifier.align(Alignment.BottomStart).padding(start = 48.dp, bottom = 27.dp).alpha(label.value),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
+            KeyHint("OK", if (isPaused) "Play" else "Pause")
             if (cams.size > 1) KeyHint("◀ ▶", "Switch camera")
             KeyHint("Back", "Cameras")
         }

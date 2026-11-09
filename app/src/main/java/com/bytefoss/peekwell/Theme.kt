@@ -182,13 +182,15 @@ fun StatusLabel(text: String, dotColor: Color, modifier: Modifier = Modifier, is
  * which can sit in rounded, animated cards. Released when it leaves the screen. Until the picture moves, and whenever
  * it stops, a loader says what's happening, so a blank or frozen picture never looks like the app is stuck. Once Live
  * gives up its quick retries it says what's wrong instead, with failedAction under it (how to retry, where the screen
- * has a way to); onFailed tells the caller, and raising retryRequest tries again at once.
+ * has a way to); onFailed tells the caller, and raising retryRequest tries again at once. isPaused holds the picture
+ * (see Live.isPaused).
  */
 @Composable
 fun LiveVideo(
     cam: Cam, hd: Boolean, modifier: Modifier = Modifier, surface: Boolean = false, muted: Boolean = true,
     onPlaying: (Boolean) -> Unit = {}, onFirstFrame: () -> Unit = {},
     retryRequest: Int = 0, onFailed: (Boolean) -> Unit = {}, failedAction: @Composable () -> Unit = {},
+    isPaused: Boolean = false,
 ) {
     key(cam.getStreamUrl(hd)) {
         // what the viewer is waiting for, null while the picture is live; and whether it failed rather than is loading
@@ -207,6 +209,7 @@ fun LiveVideo(
             if (isFailed) onFailed(false)
             isFailed = false
         }
+        LaunchedEffect(isPaused, shownLive) { shownLive?.isPaused = isPaused }
         Box(modifier) {
             AndroidView(
                 factory = { context ->

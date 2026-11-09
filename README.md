@@ -23,7 +23,7 @@ leaves your network.
 
 ## Features
 
-- **Live grid** of every camera, muted. **Full screen** with sound; Left and Right switch cameras.
+- **Live grid** of every camera, muted. **Full screen** with sound; OK pauses, Left and Right switch cameras.
 - **Finds your cameras**: ONVIF discovery shows each camera's model and address. Adding one takes three short
   steps: pick it, sign in, name it, with a live preview before you save.
 - **Alerts over any app** (optional): a live picture slides in from the corner for 20 seconds, labelled with what
@@ -73,7 +73,7 @@ screen for the "Display over other apps" permission (most don't).
    2. **Sign in** with the camera's ONVIF login and choose **Connect**.
    3. **Name**: see it live, pick a name (Front door, Garage, ... or your own) and the detections that should alert,
       then **Add camera**.
-3. On the grid, **OK** opens a camera full screen, and **Hold OK** edits it. **Settings**, at the top right, turns
+3. On the grid, **OK** opens a camera full screen (OK there pauses), and **Hold OK** edits it. **Settings**, at the top right, turns
    alerts on and sets the alert sound and quiet hours.
 
 ### Motion alerts

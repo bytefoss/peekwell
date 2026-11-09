@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Peekwell's app icon: the colour mark on a night tile. Generated from the brand kit's peekwell-symbol.svg -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="48dp" android:height="48dp" android:viewportWidth="256" android:viewportHeight="256">
+    android:width="80dp" android:height="80dp" android:viewportWidth="256" android:viewportHeight="256">
     <path android:fillColor="#FF0F1512" android:pathData="M0,0h256v256h-256z" />
     <group android:translateX="5" android:translateY="10">
         <path android:fillColor="#FF8CD5B4" android:pathData="M110 183H50A37 37 0 0 1 13 146V68A37 37 0 0 1 50 31H178A37 37 0 0 1 215 68V114H197V68A19 19 0 0 0 178 49H50A19 19 0 0 0 31 68V146A19 19 0 0 0 50 165H110Z" />

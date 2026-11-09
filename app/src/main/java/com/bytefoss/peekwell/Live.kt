@@ -49,12 +49,27 @@ class Live(private val ctx: Context, private val cam: Cam, private val hd: Boole
             hasGivenUp = false
         }
     }
-    private val stallCheck = Runnable { if (!released && !player.isPlaying) loseStream(null) }
+    /**
+     * Paused by the viewer: the last picture stays and nothing is retried. Resuming starts a fresh player, so the
+     * viewer sees the camera as it is now rather than where the paused stream stopped.
+     */
+    var isPaused = false
+        set(value) {
+            if (field == value) return
+            field = value
+            if (value) {
+                handler.removeCallbacksAndMessages(null)
+                player.playWhenReady = false
+            } else {
+                retryNow()
+            }
+        }
+    private val stallCheck = Runnable { if (!released && !isPaused && !player.isPlaying) loseStream(null) }
     // A fresh player for every try: one whose playback thread died (Media3 can't parse something a camera sent; CamApp
     // keeps that from crashing the app) never answers again. It counts as lost if it isn't playing within STALL_MS,
     // even when it never reports anything
     private val restart = Runnable {
-        if (released) return@Runnable
+        if (released || isPaused) return@Runnable
         player.release()
         player = buildPlayer()
         handler.postDelayed(stallCheck, STALL_MS)
@@ -95,6 +110,7 @@ class Live(private val ctx: Context, private val cam: Cam, private val hd: Boole
 
     /** Wi-Fi blips and camera reboots: keep trying while someone is looking. */
     private fun loseStream(error: PlaybackException?) {
+        if (isPaused) return // a camera that drops a paused stream is simply started again on resume
         val now = SystemClock.elapsedRealtime()
         if (failingSince == 0L) failingSince = now
         hasGivenUp = now - failingSince >= QUICK_RETRY_MS

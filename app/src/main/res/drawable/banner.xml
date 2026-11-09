@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Peekwell's TV launcher banner: the colour lockup (mint frame and word, amber pop-up card) on the night tone.
-     Generated from the brand kit's peekwell-horizontal.svg; colours are AppColors (Theme.kt) -->
+     Generated from the brand kit's peekwell-horizontal.svg; colours are AppColors (Theme.kt). 160x90 dp is the
+     320x180 px at xhdpi that Android TV asks for -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="320dp" android:height="180dp" android:viewportWidth="320" android:viewportHeight="180">
+    android:width="160dp" android:height="90dp" android:viewportWidth="320" android:viewportHeight="180">
     <path android:fillColor="#FF0F1512" android:pathData="M0,0h320v180h-320z" />
     <group android:translateX="30" android:translateY="51.26" android:scaleX="0.30268" android:scaleY="0.30268">
         <group android:translateX="5" android:translateY="10">
