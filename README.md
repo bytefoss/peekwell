@@ -35,7 +35,7 @@ leaves your network.
   does.
 - **Recovers by itself**: reconnects dropped video, survives camera reboots and Wi-Fi drops, starts at boot, and
   follows a camera to its new address when the router changes it.
-- **Private**: camera logins are stored only on the TV, in the app's private storage.
+- **Private**: camera logins are stored only on the TV, in the app's private storage. See the [privacy policy](PRIVACY.md).
 
 ## Requirements
 
