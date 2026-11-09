@@ -99,9 +99,9 @@ class Cam {
             getPrefs(ctx).edit().putString("cams", camerasJson.toString()).apply()
         }
 
-        /** Motion alerts, for all cameras. Off until the user turns them on: not every camera firmware sends events. */
+        /** Motion alerts, for all cameras. On until the user turns them off. */
         @JvmStatic
-        fun isAlertsOn(ctx: Context): Boolean = getPrefs(ctx).getBoolean("alerts", false)
+        fun isAlertsOn(ctx: Context): Boolean = getPrefs(ctx).getBoolean("alerts", true)
 
         @JvmStatic
         fun setAlerts(ctx: Context, on: Boolean) = getPrefs(ctx).edit().putBoolean("alerts", on).apply()

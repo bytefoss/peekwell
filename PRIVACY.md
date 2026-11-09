@@ -15,8 +15,9 @@ tracking, and it doesn't send anything to us or to anyone else.
   the standard ONVIF discovery message and by checking addresses on that network. It doesn't contact anything
   outside it.
 - **Spoken alerts.** Announcements such as "Person detected" are spoken by your TV's own text-to-speech engine.
-- **Permissions.** Peekwell uses the network to reach your cameras, shows its alert pop-up over other apps only
-  when you turn on Motion alerts, and while they're on, starts again after the TV restarts so alerts keep working.
+- **Permissions.** Peekwell uses the network to reach your cameras, shows its alert pop-up over other apps while
+  Motion alerts are on (the default; you can turn them off in Settings), and while they're on, starts again after
+  the TV restarts so alerts keep working.
 
 ## Deleting your data
 

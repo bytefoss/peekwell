@@ -73,13 +73,13 @@ screen for the "Display over other apps" permission (most don't).
    2. **Sign in** with the camera's ONVIF login and choose **Connect**.
    3. **Name**: see it live, pick a name (Front door, Garage, ... or your own) and the detections that should alert,
       then **Add camera**.
-3. On the grid, **OK** opens a camera full screen (OK there pauses), and **Hold OK** edits it. **Settings**, at the top right, turns
-   alerts on and sets the alert sound and quiet hours.
+3. On the grid, **OK** opens a camera full screen (OK there pauses), and **Hold OK** edits it. **Settings**, at the
+   top right, turns alerts off or on and sets the alert sound and quiet hours.
 
 ### Motion alerts
 
-Alerts are **off by default**. Turn on **Motion alerts** in Settings. When a camera detects something, a small live
-picture slides in over whatever is playing, with a tag saying what was detected, and stays until 20 seconds after
+Alerts are **on by default**; turn **Motion alerts** off in Settings if you only want to watch. When a
+camera detects something, a small live picture slides in over whatever is playing, with a tag saying what was detected, and stays until 20 seconds after
 the last detection.
 
 | Camera event | Tag | Spoken |
