@@ -23,8 +23,8 @@ android {
         minSdk 26
         // Google Play requires new apps and updates to target a recent API level
         targetSdk 36
-        versionCode 6
-        versionName '1.5'
+        versionCode 7
+        versionName '1.5.1'
     }
 
     signingConfigs {
