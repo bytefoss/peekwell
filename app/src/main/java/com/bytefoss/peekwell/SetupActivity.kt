@@ -601,6 +601,9 @@ private fun AddCamera(activity: ComponentActivity, cams: MutableList<Cam>) {
         cams += camera
         Cam.saveCameras(ctx, cams)
         MotionService.syncService(ctx, true)
+        // alerts are on by default, and a camera is what they need: ask for the pop-up permission now, not only when
+        // alerts are switched off and on again (where it can't ask, the grid says what's missing)
+        if (Cam.isAlertsOn(ctx) && !Settings.canDrawOverlays(ctx)) askOverlayPermission(ctx)
         activity.finish()
     }
 
