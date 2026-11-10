@@ -218,6 +218,7 @@ fun LiveVideo(
                     shownLive = live
                     live.onStreamLost = { error ->
                         Log.w("peekwell", "${cam.host}: video ${error?.errorCodeName ?: "stopped"}" + if (live.hasGivenUp) ", gave up" else "")
+                        Report.noteVideoProblem(cam.host, (error?.errorCodeName ?: "the stream stopped") + if (live.hasGivenUp) ", gave up" else "")
                         // the camera refused the login: RTSP answers 401, somewhere down the causes. Retrying
                         // won't fix that, so it's shown at once
                         val isLoginRefused = generateSequence<Throwable>(error) { it.cause }.any { "401" in it.message.orEmpty() }

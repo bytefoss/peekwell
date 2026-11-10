@@ -66,12 +66,33 @@ class Onvif @JvmOverloads constructor(
     }
 
     /**
-     * Asks the camera where its events and video are, and stores them on the camera: the event address, and RTSP
-     * addresses for its largest (HD) and smallest video profiles. Until a camera is asked, the app assumes the
-     * common :2020/onvif/service, stream1 and stream2.
+     * What a problem report says about the camera: make, model, hardware and firmware (never its serial number),
+     * then its ONVIF version and profiles when it says. Throws when it won't give its device information, usually a
+     * refused login.
      */
     @Throws(IOException::class)
-    fun findServiceAddresses() {
+    fun describeDevice(): List<String> {
+        val information = postSoap(service, "<GetDeviceInformation xmlns=\"$DEVICE\"/>",
+            null, auth = true, pull = false, timeoutMs = 10_000)
+        val lines = describeDeviceInformation(information).toMutableList()
+        runCatching {
+            postSoap(service, "<GetCapabilities xmlns=\"$DEVICE\"><Category>Device</Category></GetCapabilities>",
+                null, auth = true, pull = false, timeoutMs = 10_000)
+        }.getOrNull()?.let { findOnvifVersion(it) }?.let { lines += "ONVIF version: $it" }
+        runCatching {
+            postSoap(service, "<GetScopes xmlns=\"$DEVICE\"/>", null, auth = true, pull = false, timeoutMs = 10_000)
+        }.getOrNull()?.let { listOnvifProfiles(it) }?.takeIf { it.isNotEmpty() }?.let { lines += "ONVIF profiles: " + it.joinToString(", ") }
+        return lines
+    }
+
+    /**
+     * Asks the camera where its events and video are, and stores them on the camera: the event address, and RTSP
+     * addresses for its largest (HD) and smallest video profiles. Until a camera is asked, the app assumes the
+     * common :2020/onvif/service, stream1 and stream2. Returns its video profiles as "H264 1920x1080", for a problem
+     * report.
+     */
+    @Throws(IOException::class)
+    fun findServiceAddresses(): List<String> {
         val capabilities = postSoap(service, "<GetCapabilities xmlns=\"$DEVICE\"><Category>All</Category></GetCapabilities>",
             null, auth = true, pull = false, timeoutMs = 10_000)
         val eventsUrl = getTagText(capabilities.substringAfter("Events>", ""), "XAddr")
@@ -87,6 +108,11 @@ class Onvif @JvmOverloads constructor(
         cam.streamUrlHd = getStreamUri(mediaUrl, videoProfiles.maxBy { it.second }.first)
         cam.streamUrlSd = getStreamUri(mediaUrl, videoProfiles.minBy { it.second }.first)
         cam.eventsUrl = eventsUrl
+        return PROFILE.findAll(profilesResponse).mapNotNull { profile ->
+            val encoder = profile.groupValues[2].substringAfter("VideoEncoderConfiguration", "")
+            val width = getTagText(encoder, "Width").ifEmpty { return@mapNotNull null }
+            "${getTagText(encoder, "Encoding")} ${width}x${getTagText(encoder, "Height")}".trim()
+        }.toList()
     }
 
     @Throws(IOException::class)
@@ -341,6 +367,30 @@ class Onvif @JvmOverloads constructor(
         @JvmStatic
         fun getTagText(xml: String, name: String): String =
             Regex("""<(?:[\w.-]+:)?$name(?:\s[^>]*)?>([^<]*)<""").find(xml)?.groupValues?.get(1)?.trim() ?: ""
+
+        /** From a GetDeviceInformation answer: "Device: Make Model", "Hardware: …", "Firmware: …", leaving out blanks. */
+        @JvmStatic
+        fun describeDeviceInformation(xml: String): List<String> = listOfNotNull(
+            "Device: " + (getTagText(xml, "Manufacturer") + " " + getTagText(xml, "Model")).trim(),
+            getTagText(xml, "HardwareId").ifEmpty { null }?.let { "Hardware: $it" },
+            getTagText(xml, "FirmwareVersion").ifEmpty { null }?.let { "Firmware: $it" },
+        )
+
+        /** The newest ONVIF version a GetCapabilities answer lists under SupportedVersions ("17.06"); null when none. */
+        @JvmStatic
+        fun findOnvifVersion(xml: String): String? =
+            Regex("""SupportedVersions>\s*<(?:[\w.-]+:)?Major>(\d+)<.*?<(?:[\w.-]+:)?Minor>(\d+)<""", RegexOption.DOT_MATCHES_ALL)
+                .findAll(xml).map { it.groupValues[1].toInt() to it.groupValues[2].toInt() }
+                .maxWithOrNull(compareBy({ it.first }, { it.second }))
+                // since 2016 versions are year.month (17.06); before that 2.4
+                ?.let { (major, minor) -> "$major." + if (major >= 16) minor.toString().padStart(2, '0') else "$minor" }
+
+        /** The ONVIF profiles a GetScopes answer claims, as their letters: Streaming is S, the newer ones are named by letter. */
+        @JvmStatic
+        fun listOnvifProfiles(xml: String): List<String> =
+            Regex("""onvif://www\.onvif\.org/Profile/(\w+)""").findAll(xml)
+                .map { if (it.groupValues[1].equals("Streaming", ignoreCase = true)) "S" else it.groupValues[1].uppercase() }
+                .distinct().sorted().toList()
 
         /**
          * ONVIF cameras on the network that answer a WS-Discovery probe within waitMs, any brand: (address as the

@@ -1,6 +1,6 @@
 # Peekwell privacy policy
 
-Last updated: 9 November 2026
+Last updated: 10 November 2026
 
 Peekwell doesn't collect, store or share any personal data. It has no accounts, no analytics, no ads and no
 tracking, and it doesn't send anything to us or to anyone else.
@@ -18,6 +18,13 @@ tracking, and it doesn't send anything to us or to anyone else.
 - **Permissions.** Peekwell uses the network to reach your cameras, shows its alert pop-up over other apps while
   Motion alerts are on (the default; you can turn them off in Settings), and while they're on, starts again after
   the TV restarts so alerts keep working.
+
+## Problem reports
+
+**Settings → Report a problem** checks your cameras and shows a short report on the TV: the app and Android
+version, the TV model, and for each camera its make, model, firmware, video formats and what went wrong. It never
+includes usernames, passwords or full addresses. The report stays on the TV. It's only shared if you scan its QR
+code with your phone and choose to send it as an issue on GitHub, where it's public.
 
 ## Deleting your data
 

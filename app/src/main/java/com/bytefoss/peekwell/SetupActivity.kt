@@ -23,7 +23,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
@@ -91,6 +94,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -104,6 +108,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
@@ -173,7 +178,112 @@ class SettingsActivity : ComponentActivity() {
                         Text(status, Modifier.padding(top = 12.dp).widthIn(max = TEXT_WIDTH), style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.error)
                     }
+                    Heading("Help")
+                    SegmentedGroup {
+                        val shapes = ListItemDefaults.segmentedShapes(0, 1)
+                        SegmentedListItem(
+                            onClick = { startActivity(Intent(this@SettingsActivity, ReportActivity::class.java)) },
+                            shapes = shapes, modifier = Modifier.focusIndicator(shapes.focusedShape, isInside = true),
+                            supportingContent = { Text("Checks your cameras and shows a report you can send from your phone") },
+                        ) { Text("Report a problem") }
+                    }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Report a problem: checks every camera, then shows the report beside a QR code that opens it as a GitHub issue on
+ * the user's phone. Nothing leaves the TV unless they scan it and send it.
+ */
+class ReportActivity : ComponentActivity() {
+    override fun onCreate(state: Bundle?) {
+        super.onCreate(state)
+        setContent { CamTheme { ProblemReport(this) } }
+    }
+}
+
+@Composable
+private fun ProblemReport(ctx: ComponentActivity) {
+    val cams = remember { Cam.loadCameras(ctx) }
+    var progress by remember { mutableStateOf("") }
+    var report by remember { mutableStateOf<String?>(null) }
+    var checkRequest by remember { mutableIntStateOf(0) }
+    val againFocus = remember { FocusRequester() }
+    val reportFocus = remember { FocusRequester() }
+    val backFocus = remember { FocusRequester() } // while the checks run, the one thing to press
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(checkRequest) {
+        report = null
+        val sections = cams.mapIndexed { i, cam ->
+            progress = "Checking ${cam.name} (${i + 1} of ${cams.size})…"
+            val lines = withContext(Dispatchers.IO) { Report.checkOnvif(cam) }
+            progress = "Testing ${cam.name}'s video…"
+            val overTcp = Report.testVideo(ctx, cam, isOverTcp = true)
+            // only when TCP gave no picture: whether the camera sends video the other way
+            val overUdp = if (overTcp.startsWith("picture")) "not needed" else Report.testVideo(ctx, cam, isOverTcp = false)
+            cam to lines + listOf(
+                "Video over TCP: $overTcp", "Video over UDP: $overUdp",
+                "Last video problem: ${Report.getLastVideoProblem(cam.host)}",
+                "Alerts: ${MotionService.alertProblems[cam.host] ?: "no problem shown"}",
+            )
+        }
+        report = Report.buildReport(Report.describeTv(ctx, cams), sections)
+    }
+    LaunchedEffect(report) { runCatching { (if (report != null) againFocus else backFocus).requestFocus() } }
+
+    Column(
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 96.dp, vertical = 40.dp),
+    ) {
+        val shownReport = report
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Report a problem", Modifier.weight(1f), style = MaterialTheme.typography.headlineLargeEmphasized,
+                color = MaterialTheme.colorScheme.onSurface)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (shownReport != null) {
+                    Action("Check again", modifier = Modifier.focusRequester(againFocus).focusProperties { down = reportFocus }) {
+                        checkRequest++
+                    }
+                }
+                Action("Back", modifier = Modifier.focusRequester(backFocus).focusProperties { if (shownReport != null) down = reportFocus }) {
+                    ctx.finish()
+                }
+            }
+        }
+        if (shownReport == null) {
+            StatusRow(progress.ifEmpty { "Checking your cameras…" }, isProblem = false, isWaiting = true)
+            return@Column
+        }
+        Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
+            // focusable, so Up and Down scroll a report longer than the screen; Up at its top goes on to Check again
+            val reportScroll = rememberScrollState()
+            Text(
+                shownReport,
+                Modifier.weight(1f).focusRequester(reportFocus).focusIndicator(MaterialTheme.shapes.small)
+                    .onPreviewKeyEvent { keyEvent ->
+                        if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        val step = when (keyEvent.key) {
+                            Key.DirectionDown -> 240f
+                            Key.DirectionUp -> if (reportScroll.value == 0) return@onPreviewKeyEvent false else -240f
+                            else -> return@onPreviewKeyEvent false
+                        }
+                        scope.launch { reportScroll.animateScrollBy(step) }
+                        true
+                    }
+                    .focusable().verticalScroll(reportScroll).padding(12.dp),
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Column(Modifier.width(300.dp)) {
+                val qrCode = remember(shownReport) { Report.makeQrCode(Report.buildIssueUrl(shownReport), 600).asImageBitmap() }
+                Image(qrCode, "QR code that opens this report as a GitHub issue", Modifier.size(300.dp))
+                Text(
+                    "Scan with your phone to send this report as a GitHub issue. Nothing is sent from the TV, and the " +
+                        "report has no passwords or full addresses.",
+                    Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             }
         }
     }

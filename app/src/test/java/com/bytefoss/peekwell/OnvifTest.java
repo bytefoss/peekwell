@@ -1,6 +1,7 @@
 package com.bytefoss.peekwell;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 
 import org.junit.Test;
@@ -195,5 +196,32 @@ public class OnvifTest {
                 + "</wsdd:ProbeMatch></wsdd:ProbeMatches></SOAP-ENV:Body></SOAP-ENV:Envelope>";
         assertEquals("urn:uuid:12345678-0000-0000-0000-000000000000", Onvif.readDiscoveryId(reply));
         assertEquals("", Onvif.readDiscoveryId("<wsdd:ProbeMatch></wsdd:ProbeMatch>"));
+    }
+
+    // Shaped like a C320WS's answers (whitespace removed); a serial number must never reach a report
+    @Test
+    public void deviceDescriptionForAReport() {
+        String information = "<tds:GetDeviceInformationResponse><tds:Manufacturer>tp-link</tds:Manufacturer>"
+                + "<tds:Model>C320WS</tds:Model><tds:FirmwareVersion>1.6.6 Build 260917 Rel.62025n</tds:FirmwareVersion>"
+                + "<tds:SerialNumber>8C902D1A2B3C</tds:SerialNumber><tds:HardwareId>2.0</tds:HardwareId>"
+                + "</tds:GetDeviceInformationResponse>";
+        assertEquals(java.util.Arrays.asList("Device: tp-link C320WS", "Hardware: 2.0", "Firmware: 1.6.6 Build 260917 Rel.62025n"),
+                Onvif.describeDeviceInformation(information));
+        assertFalse(String.join(" ", Onvif.describeDeviceInformation(information)).contains("8C902D1A2B3C"));
+        // blanks left out
+        assertEquals(java.util.Collections.singletonList("Device: Acme X1"),
+                Onvif.describeDeviceInformation("<Manufacturer>Acme</Manufacturer><Model>X1</Model>"));
+
+        String capabilities = "<tt:Device><tt:System><tt:SupportedVersions><tt:Major>2</tt:Major><tt:Minor>40</tt:Minor>"
+                + "</tt:SupportedVersions><tt:SupportedVersions><tt:Major>17</tt:Major><tt:Minor>6</tt:Minor>"
+                + "</tt:SupportedVersions></tt:System></tt:Device>";
+        assertEquals("17.06", Onvif.findOnvifVersion(capabilities));
+        assertEquals("2.4", Onvif.findOnvifVersion("<SupportedVersions><Major>2</Major><Minor>4</Minor></SupportedVersions>"));
+        assertNull(Onvif.findOnvifVersion("<tt:Device/>"));
+
+        String scopes = "<tds:Scopes><tt:ScopeItem>onvif://www.onvif.org/Profile/Streaming</tt:ScopeItem></tds:Scopes>"
+                + "<tds:Scopes><tt:ScopeItem>onvif://www.onvif.org/Profile/T</tt:ScopeItem></tds:Scopes>"
+                + "<tds:Scopes><tt:ScopeItem>onvif://www.onvif.org/hardware/C320WS</tt:ScopeItem></tds:Scopes>";
+        assertEquals(java.util.Arrays.asList("S", "T"), Onvif.listOnvifProfiles(scopes));
     }
 }

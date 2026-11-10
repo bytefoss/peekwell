@@ -141,6 +141,7 @@ shrunk with R8.
 | A tile says alerts can't work | The tile says why: the camera refused the login, can't be reached, or another device is holding its events. Some cameras serve events to only one app at a time. |
 | Alerts never come | The camera may not send ONVIF events, or the detection is off in the camera's own app. Run `adb logcat -s peekwell` and walk past the camera: a working camera logs `pull … IsMotion=true`. |
 | A camera got a new address | Nothing to do: Peekwell finds it again by its ONVIF ID within a minute or two. |
+| Anything else | **Settings → Report a problem** checks every camera and shows a report with a QR code: scan it with your phone to open a GitHub issue with the report filled in. It has no passwords or full addresses. |
 
 ## How it works
 
