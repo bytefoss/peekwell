@@ -363,8 +363,9 @@ private fun AddCamera(activity: ComponentActivity, cams: MutableList<Cam>) {
     val camera = remember { Cam() } // filled in as the steps go
     var model by remember { mutableStateOf("") } // as the camera announced itself on the network, or said on Connect
     val hostField = rememberTextFieldState()
-    // most homes use one camera login: the last one added is filled in
-    val userField = rememberTextFieldState(cams.lastOrNull()?.user ?: "")
+    val userField = rememberTextFieldState()
+    // most homes reuse a camera login: the saved ones are offered on Sign in, under the fields, as a shortcut
+    val savedLogins = remember { Cam.listSavedLogins(cams) }
     val passField = rememberTextFieldState()
     var isPasswordShown by remember { mutableStateOf(false) }
     var isLoginRefused by remember { mutableStateOf(false) } // the last Connect: the password is what to fix
@@ -441,11 +442,14 @@ private fun AddCamera(activity: ComponentActivity, cams: MutableList<Cam>) {
         if (address.isEmpty()) showStatus("Enter the camera's address", problem = true) else pickCamera(address, "")
     }
 
-    /** Signs in, then asks where its video and alerts are and what it can detect; on to step 3 when that works. */
-    fun connect() {
+    /**
+     * Signs in, then asks where its video and alerts are and what it can detect; on to step 3 when that works. With
+     * savedLogin, signs in with another camera's login instead of the fields, which it leaves as they are.
+     */
+    fun connect(savedLogin: Pair<String, String>? = null) {
         if (isWaiting) return
-        camera.user = userField.text.toString().trim()
-        camera.pass = passField.text.toString()
+        camera.user = savedLogin?.first ?: userField.text.toString().trim()
+        camera.pass = savedLogin?.second ?: passField.text.toString()
         if (camera.user.isEmpty() || camera.pass.isEmpty()) {
             showStatus("Enter the username and password", problem = true)
             return
@@ -471,7 +475,7 @@ private fun AddCamera(activity: ComponentActivity, cams: MutableList<Cam>) {
                 model = cameraModel
                 goToStep(3)
             }.onFailure {
-                isLoginRefused = Watcher.isAuthError(it)
+                isLoginRefused = Watcher.isAuthError(it) && savedLogin == null
                 showStatus(describeConnectError(it, camera.host), problem = true)
             }
         }
@@ -495,6 +499,9 @@ private fun AddCamera(activity: ComponentActivity, cams: MutableList<Cam>) {
     // address when there's none
     LaunchedEffect(step, isManual, isWaiting) {
         if (isWaiting) return@LaunchedEffect
+        // after a Connect that failed, focus stays where it was (the chip or button just pressed), except a refused
+        // typed password, which is what to fix
+        if (step == 2 && status.isNotEmpty() && !isLoginRefused) return@LaunchedEffect
         val target = when {
             step == 1 && !isManual && found.isEmpty() -> manualFocus
             step == 2 && isLoginRefused -> passwordFocus
@@ -503,10 +510,14 @@ private fun AddCamera(activity: ComponentActivity, cams: MutableList<Cam>) {
         runCatching { target.requestFocus() }
     }
     BackHandler(enabled = step > 1 && !isWaiting) { goToStep(step - 1) }
+    // each step opens at its top: the page scrolled for one step (the keyboard, a status line) mustn't push the
+    // next step's title into the TV's edge
+    val scroll = rememberScrollState()
+    LaunchedEffect(step) { scroll.scrollTo(0) }
 
     // a step fits on one TV screen: each has its one main action in view without scrolling
     Column(
-        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).verticalScroll(rememberScrollState())
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).verticalScroll(scroll)
             .padding(horizontal = 96.dp, vertical = 32.dp),
     ) {
         Row(verticalAlignment = Alignment.Top) {
@@ -575,11 +586,27 @@ private fun AddCamera(activity: ComponentActivity, cams: MutableList<Cam>) {
                 Field("Username", "", userField, Modifier.focusRequester(firstFocus))
                 Field(
                     "Password", "", passField, Modifier.focusRequester(passwordFocus).focusProperties { down = mainButtonFocus },
-                    keyboard = KeyboardType.Password, isSecret = true, isRevealed = isPasswordShown, onDone = ::connect,
+                    keyboard = KeyboardType.Password, isSecret = true, isRevealed = isPasswordShown, onDone = { connect() },
                 )
                 ShowPasswordChip(isPasswordShown) { isPasswordShown = it }
                 FlowRow(Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Action("Connect", isPrimary = true, Modifier.focusRequester(mainButtonFocus)) { connect() }
+                }
+                // a shortcut for a camera sharing a login already saved: one OK press, the password never shown
+                if (savedLogins.isNotEmpty()) {
+                    Heading("Or use a saved login", topPadding = 24.dp)
+                    FlowRow(
+                        Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        savedLogins.forEach { (login, names) ->
+                            FilterChip(
+                                selected = false, onClick = { connect(login) },
+                                label = { Text("${login.first} · ${listCameraNames(names)}") },
+                                modifier = Modifier.focusIndicator(FilterChipDefaults.shape),
+                            )
+                        }
+                    }
                 }
                 StatusRow(status, isProblem, isWaiting)
             }
@@ -608,6 +635,13 @@ private fun AddCamera(activity: ComponentActivity, cams: MutableList<Cam>) {
             }
         }
     }
+}
+
+/** Camera names for one line: "Front door", "Front door and Garage", "Front door, Garage and 2 more". */
+internal fun listCameraNames(names: List<String>): String = when (names.size) {
+    1 -> names[0]
+    2 -> "${names[0]} and ${names[1]}"
+    else -> "${names[0]}, ${names[1]} and ${names.size - 2} more"
 }
 
 // Names most cameras get: picked with the remote instead of typed

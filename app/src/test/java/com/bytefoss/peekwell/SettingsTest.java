@@ -122,6 +122,37 @@ public class SettingsTest {
         assertEquals("p1 p2 v m t ", spokenOrder.toString());
     }
 
+    @Test
+    public void savedLoginsGroupedMostSharedFirst() {
+        List<Cam> cams = Arrays.asList(camWithLogin("Front door", "viewer", "one"), camWithLogin("Gate", "admin", "two"),
+                camWithLogin("Garage", "viewer", "one"), camWithLogin("New", "", ""), // no login saved: not offered
+                camWithLogin("Backyard", "admin", "three"));
+        List<kotlin.Pair<kotlin.Pair<String, String>, List<String>>> logins = Cam.listSavedLogins(cams);
+        assertEquals(3, logins.size());
+        // shared by two cameras, so first
+        assertEquals(new kotlin.Pair<>("viewer", "one"), logins.get(0).getFirst());
+        assertEquals(Arrays.asList("Front door", "Garage"), logins.get(0).getSecond());
+        // same username, different passwords: two logins, the most recently added camera's first
+        assertEquals(new kotlin.Pair<>("admin", "three"), logins.get(1).getFirst());
+        assertEquals(new kotlin.Pair<>("admin", "two"), logins.get(2).getFirst());
+        assertTrue(Cam.listSavedLogins(Collections.<Cam>emptyList()).isEmpty());
+    }
+
+    @Test
+    public void cameraNamesFitOneLine() {
+        assertEquals("Gate", SetupActivityKt.listCameraNames(Collections.singletonList("Gate")));
+        assertEquals("Gate and Garage", SetupActivityKt.listCameraNames(Arrays.asList("Gate", "Garage")));
+        assertEquals("Gate, Garage and 2 more", SetupActivityKt.listCameraNames(Arrays.asList("Gate", "Garage", "A", "B")));
+    }
+
+    private static Cam camWithLogin(String name, String user, String pass) {
+        Cam c = new Cam();
+        c.name = name;
+        c.user = user;
+        c.pass = pass;
+        return c;
+    }
+
     private static Cam camAt(String host, String id) {
         Cam c = new Cam();
         c.host = host;

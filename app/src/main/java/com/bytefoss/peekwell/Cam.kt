@@ -99,6 +99,18 @@ class Cam {
             getPrefs(ctx).edit().putString("cams", camerasJson.toString()).apply()
         }
 
+        /**
+         * The logins the saved cameras use, one per username and password, each with the names of the cameras that
+         * share it: the one most cameras share first, then the one of the most recently added camera.
+         */
+        @JvmStatic
+        fun listSavedLogins(cams: List<Cam>): List<Pair<Pair<String, String>, List<String>>> =
+            cams.withIndex().filter { it.value.user.isNotEmpty() && it.value.pass.isNotEmpty() }
+                .groupBy { it.value.user to it.value.pass }.entries
+                .sortedWith(compareByDescending<Map.Entry<Pair<String, String>, List<IndexedValue<Cam>>>> { it.value.size }
+                    .thenByDescending { sharing -> sharing.value.maxOf { it.index } })
+                .map { (login, sharing) -> login to sharing.map { it.value.name } }
+
         /** Motion alerts, for all cameras. On until the user turns them off. */
         @JvmStatic
         fun isAlertsOn(ctx: Context): Boolean = getPrefs(ctx).getBoolean("alerts", true)
