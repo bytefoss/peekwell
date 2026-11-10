@@ -228,6 +228,13 @@ class Cam {
         @JvmStatic
         fun setShowLabel(ctx: Context, on: Boolean) = getPrefs(ctx).edit().putBoolean("show_label", on).apply()
 
+        /** The pop-up's corner: "bottom_right" (the default), "bottom_left", "top_right" or "top_left". */
+        @JvmStatic
+        fun getAlertPosition(ctx: Context): String = getPrefs(ctx).getString("alert_position", "bottom_right") ?: "bottom_right"
+
+        @JvmStatic
+        fun setAlertPosition(ctx: Context, position: String) = getPrefs(ctx).edit().putString("alert_position", position).apply()
+
         private fun getPrefs(ctx: Context): SharedPreferences = ctx.getSharedPreferences("cams", Context.MODE_PRIVATE)
     }
 }

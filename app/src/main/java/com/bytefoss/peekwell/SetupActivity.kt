@@ -925,12 +925,17 @@ private fun AlertSettings(ctx: Context, askOverlayPermission: () -> Unit) {
         }
     }
 
+    Heading("Pop-up position")
+    val alertPosition = remember { mutableStateOf(Cam.getAlertPosition(ctx)) }
+    Connected(listOf("top_left" to "Top left", "top_right" to "Top right", "bottom_left" to "Bottom left",
+        "bottom_right" to "Bottom right"), alertPosition) { Cam.setAlertPosition(ctx, it) }
+
     Heading("Alert sound")
     val alertSound = remember { mutableStateOf(Cam.getAlertSound(ctx)) }
     Connected(listOf(Cam.VOICE to "Voice", Cam.CHIME to "Chime", Cam.MUTE to "Mute"), alertSound) {
         Cam.setAlertSound(ctx, it)
     }
-    Hint("Use Test alert on a camera to hear it")
+    Hint("Use Test alert on a camera to see and hear it")
 
     Heading("Quiet hours")
     var isQuietOn by remember { mutableStateOf(Cam.isQuietOn(ctx)) }

@@ -44,11 +44,11 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 
 /**
- * The alert popups, in the bottom-right corner over whatever is on screen: one card per camera that's reporting, each
+ * The alert popups, in the corner chosen in Settings (bottom right by default) over whatever is on screen: one card per camera that's reporting, each
  * with that camera's small stream, muted. A card stays while its camera keeps reporting, and 20 seconds after the
  * last report. At most two show at once: each decodes its own live video, and TVs have few decoders. A third camera
  * replaces the card that has been quiet longest. They never take the remote's keys, so the app underneath keeps
- * working. Cards slide in from the right edge and back out with the theme's expressive motion; all live in one window.
+ * working. Cards slide in from the nearest side edge and back out with the theme's expressive motion; all live in one window.
  */
 class Overlay(private val ctx: Context) {
     private val windowManager = ctx.getSystemService(WindowManager::class.java)
@@ -85,7 +85,7 @@ class Overlay(private val ctx: Context) {
         handler.postDelayed(card.linger, LINGER_MS)
     }
 
-    /** Takes every card down: sliding out when animate, at once otherwise (the service is ending). */
+    /** Takes every card down: sliding out when animate, at once otherwise (the service is ending, or a test alert replaces them). */
     fun hide(animate: Boolean) {
         if (animate) {
             cards.filter { it.visible.targetState }.forEach(::closeCard)
@@ -110,9 +110,12 @@ class Overlay(private val ctx: Context) {
         val cardHeight = cardWidth * 9 / 16
         // Android TV's safe area: 5% in from each edge, as some TVs crop the picture (overscan)
         val margin = displayMetrics.widthPixels / 20
-        val bottomMargin = displayMetrics.heightPixels / 20
+        val verticalMargin = displayMetrics.heightPixels / 20
         val isNamed = Cam.loadCameras(ctx).size > 1 // the camera's name only helps with more than one
         val isLabelShown = Cam.isLabelShown(ctx)
+        val position = Cam.getAlertPosition(ctx)
+        val isTop = position.startsWith("top")
+        val isLeft = position.endsWith("left")
         val windowOwner = WindowOwner()
         val view = ComposeView(ctx)
         view.setViewTreeLifecycleOwner(windowOwner)
@@ -121,19 +124,21 @@ class Overlay(private val ctx: Context) {
             CamTheme {
                 val density = LocalDensity.current
                 val motion = MaterialTheme.motionScheme
-                // The window reaches the screen's right edge, so a card slides in from beyond it uncut
+                // The window reaches the screen's side edge, so a card slides in from beyond it uncut
+                val edgePadding = with(density) { margin.toDp() }
+                val fromEdge = { width: Int -> if (isLeft) -(width + margin) else width + margin }
                 Column(
-                    Modifier.fillMaxSize().padding(end = with(density) { margin.toDp() }),
-                    verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Bottom),
-                    horizontalAlignment = Alignment.End,
+                    Modifier.fillMaxSize().padding(start = if (isLeft) edgePadding else 0.dp, end = if (isLeft) 0.dp else edgePadding),
+                    verticalArrangement = Arrangement.spacedBy(16.dp, if (isTop) Alignment.Top else Alignment.Bottom),
+                    horizontalAlignment = if (isLeft) Alignment.Start else Alignment.End,
                 ) {
                     for (card in cards) key(card) {
                         AnimatedVisibility(
                             card.visible,
-                            enter = slideInHorizontally(motion.defaultSpatialSpec()) { it + margin } +
+                            enter = slideInHorizontally(motion.defaultSpatialSpec(), fromEdge) +
                                     expandVertically(motion.defaultSpatialSpec()) + fadeIn(motion.defaultEffectsSpec()),
                             // the other card moves into the gap as this one goes
-                            exit = slideOutHorizontally(motion.fastSpatialSpec()) { it + margin } +
+                            exit = slideOutHorizontally(motion.fastSpatialSpec(), fromEdge) +
                                     shrinkVertically(motion.fastSpatialSpec()) + fadeOut(motion.fastEffectsSpec()),
                         ) {
                             ElevatedCard(
@@ -179,9 +184,9 @@ class Overlay(private val ctx: Context) {
                     WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.BOTTOM or Gravity.END
+            gravity = (if (isTop) Gravity.TOP else Gravity.BOTTOM) or (if (isLeft) Gravity.START else Gravity.END)
             x = 0
-            y = bottomMargin
+            y = verticalMargin
         }
         windowOwner.start()
         windowManager.addView(view, windowParams)

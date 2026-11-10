@@ -62,6 +62,7 @@ class MotionService : Service() {
                     val sound = Cam.getSoundNow(this)
                     Log.i(TAG, "${cam.host}: test alert $kind, sound $sound")
                     if (kind == null) return@post // every kind switched off: nothing would alert
+                    overlay.hide(false) // a fresh pop-up, with the tag and position as they're set now
                     announcer.announce(kind, if (cams.size > 1) cam.name else null, sound)
                     overlay.show(cam, kind)
                 }
