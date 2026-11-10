@@ -875,7 +875,7 @@ private fun describeConnectError(error: Throwable, host: String): String = when 
  * action is in the error colour.
  */
 @Composable
-private fun ConfirmDialog(title: String, text: String, confirmLabel: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+internal fun ConfirmDialog(title: String, text: String, confirmLabel: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     val cancelFocus = remember { FocusRequester() }
     AlertDialog(
         onDismissRequest = onDismiss,
