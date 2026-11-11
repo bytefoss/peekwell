@@ -106,7 +106,9 @@ class Overlay(private val ctx: Context) {
     private fun openWindow() {
         if (window != null) return
         val displayMetrics = ctx.resources.displayMetrics
-        val cardWidth = displayMetrics.widthPixels * 3 / 10
+        val alertSize = Cam.getAlertSize(ctx)
+        val widthPercent = when (alertSize) { "small" -> 22; "large" -> 40; else -> 30 }
+        val cardWidth = displayMetrics.widthPixels * widthPercent / 100
         val cardHeight = cardWidth * 9 / 16
         // Android TV's safe area: 5% in from each edge, as some TVs crop the picture (overscan)
         val margin = displayMetrics.widthPixels / 20
@@ -158,7 +160,7 @@ class Overlay(private val ctx: Context) {
                                             if (isNamed) "$shownKind · ${card.cam.name}" else shownKind,
                                             if (shownKind == "Person") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
                                             Modifier.align(Alignment.BottomStart).padding(with(density) { (cardHeight / 24).toDp() }),
-                                            isSmall = true,
+                                            isSmall = true, isCompact = alertSize == "small",
                                         )
                                     }
                                 }

@@ -19,6 +19,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.delay
 import android.view.TextureView
 import androidx.compose.foundation.BorderStroke
@@ -164,15 +166,28 @@ fun Modifier.focusIndicator(shape: Shape, isInside: Boolean = false): Modifier =
 
 /** A status dot and text on a translucent pill over video: "● CAM 1", "● Person". */
 @Composable
-fun StatusLabel(text: String, dotColor: Color, modifier: Modifier = Modifier, isSmall: Boolean = false) {
+fun StatusLabel(text: String, dotColor: Color, modifier: Modifier = Modifier, isSmall: Boolean = false, isCompact: Boolean = false) {
+    // isCompact: smaller still, for the small pop-up, where the small tag took half the card's width
     Surface(modifier, shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.85f)) {
         Row(
-            Modifier.padding(horizontal = if (isSmall) 10.dp else 16.dp, vertical = if (isSmall) 5.dp else 8.dp),
+            Modifier.padding(
+                horizontal = if (isCompact) 7.dp else if (isSmall) 10.dp else 16.dp,
+                vertical = if (isCompact) 3.dp else if (isSmall) 5.dp else 8.dp,
+            ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.size(if (isSmall) 8.dp else 10.dp).background(dotColor, CircleShape))
-            Spacer(Modifier.width(if (isSmall) 6.dp else 8.dp))
-            Text(text, style = if (isSmall) MaterialTheme.typography.labelMediumEmphasized else MaterialTheme.typography.labelLargeEmphasized)
+            Box(Modifier.size(if (isCompact) 6.dp else if (isSmall) 8.dp else 10.dp).background(dotColor, CircleShape))
+            Spacer(Modifier.width(if (isCompact) 4.dp else if (isSmall) 6.dp else 8.dp))
+            // one line, cut short when it's too long: on the small pop-up a long camera name would wrap into the loader
+            Text(
+                text,
+                style = when {
+                    isCompact -> MaterialTheme.typography.labelSmallEmphasized
+                    isSmall -> MaterialTheme.typography.labelMediumEmphasized
+                    else -> MaterialTheme.typography.labelLargeEmphasized
+                },
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -291,12 +306,14 @@ private fun VideoWaiting(waitingText: String?, isFailed: Boolean, failedAction: 
     ) {
         BoxWithConstraints(Modifier.fillMaxSize().semantics { liveRegion = LiveRegionMode.Polite }) {
             val isLarge = maxWidth > 600.dp // full screen; tiles and the pop-up are smaller
+            // the small pop-up, about 120 dp tall: a smaller loader and text, or they run into its tag
+            val isCompact = !isLarge && maxHeight < 160.dp
             // lifted clear of the name tag at the bottom of small views
             Column(
-                Modifier.align(Alignment.Center).padding(bottom = if (isLarge) 0.dp else 24.dp),
+                Modifier.align(Alignment.Center).padding(bottom = if (isLarge) 0.dp else if (isCompact) 30.dp else 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                val markSize = if (isLarge) 96.dp else 56.dp
+                val markSize = if (isLarge) 96.dp else if (isCompact) 32.dp else 56.dp
                 Crossfade(isShownFailed, animationSpec = motion.defaultEffectsSpec()) { isMarkFailed ->
                     if (isMarkFailed) {
                         Box(
@@ -313,14 +330,19 @@ private fun VideoWaiting(waitingText: String?, isFailed: Boolean, failedAction: 
                     }
                 }
                 Surface(
-                    Modifier.padding(top = if (isLarge) 20.dp else 10.dp), shape = CircleShape,
+                    Modifier.padding(top = if (isLarge) 20.dp else if (isCompact) 4.dp else 10.dp), shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.85f),
                 ) {
                     Text(
                         shownText,
-                        Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                        style = if (isLarge) MaterialTheme.typography.titleMediumEmphasized else MaterialTheme.typography.labelLargeEmphasized,
+                        Modifier.padding(horizontal = if (isCompact) 10.dp else 14.dp, vertical = if (isCompact) 3.dp else 6.dp),
+                        style = when {
+                            isLarge -> MaterialTheme.typography.titleMediumEmphasized
+                            isCompact -> MaterialTheme.typography.labelMediumEmphasized
+                            else -> MaterialTheme.typography.labelLargeEmphasized
+                        },
                         color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center, // a long problem wraps on the small pop-up
                     )
                 }
                 if (isShownFailed) Box(Modifier.padding(top = if (isLarge) 20.dp else 8.dp)) { failedAction() }

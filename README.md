@@ -74,8 +74,9 @@ screen for the "Display over other apps" permission (most don't).
    3. **Name**: see it live, pick a name (Front door, Garage, ... or your own) and the detections that should alert,
       then **Add camera**.
 3. On the grid, **OK** opens a camera full screen (OK there pauses). **Hold OK** opens its menu: **Move** to rearrange
-   the grid with the arrows (OK keeps the new order, Back cancels), **Edit** or **Delete**. **Settings**, at the
-   top right, turns alerts off or on and sets the pop-up's corner, the alert sound and quiet hours.
+   the grid with the arrows (OK keeps the new order, Back cancels), **Edit**, **Pause alerts** from that camera
+   until you resume them, or **Delete**. **Settings**, at the top right, turns alerts off or on, pauses them all for
+   30 minutes to 8 hours, and sets the pop-up's size and corner, the alert sound and quiet hours.
 
 ### Motion alerts
 

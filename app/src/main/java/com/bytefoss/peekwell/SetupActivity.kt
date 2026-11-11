@@ -9,6 +9,7 @@ import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.text.format.DateFormat
 import android.view.KeyEvent
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -81,6 +82,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -114,6 +116,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -1019,6 +1022,23 @@ private fun AlertSettings(ctx: Context, askOverlayPermission: () -> Unit) {
             Cam.setShowLabel(ctx, isOn)
         }
     }
+
+    Heading("Pause all alerts")
+    val pauseMinutes = remember { mutableStateOf(Cam.getPauseMinutes(ctx).toString()) }
+    var pausedUntil by remember { mutableLongStateOf(Cam.getPausedUntil(ctx)) }
+    Connected(listOf("0" to "Off", "30" to "30 min", "60" to "1 hour", "180" to "3 hours", "480" to "8 hours"), pauseMinutes) {
+        Cam.pauseAll(ctx, it.toInt())
+        pausedUntil = Cam.getPausedUntil(ctx)
+    }
+    Hint(
+        if (pausedUntil > 0) "Every camera is quiet until " + DateFormat.getTimeFormat(ctx).format(Date(pausedUntil))
+        else "Every camera stays quiet for that long, then alerts come back on their own. To pause one camera until " +
+            "you resume it, hold OK on it in the grid."
+    )
+
+    Heading("Pop-up size")
+    val alertSize = remember { mutableStateOf(Cam.getAlertSize(ctx)) }
+    Connected(listOf("small" to "Small", "medium" to "Medium", "large" to "Large"), alertSize) { Cam.setAlertSize(ctx, it) }
 
     Heading("Pop-up position")
     val alertPosition = remember { mutableStateOf(Cam.getAlertPosition(ctx)) }

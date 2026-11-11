@@ -145,6 +145,11 @@ class MotionService : Service() {
             Log.d(TAG, "${cam.host}: $kinds switched off for the TV, ignored")
             return
         }
+        // a camera paused from the grid is read from the saved list: pausing doesn't restart the watchers
+        if (Cam.getPausedUntil(this) > 0 || Cam.loadCameras(this).any { it.host == cam.host && it.isPaused }) {
+            Log.d(TAG, "${cam.host}: $kind while alerts are paused, ignored")
+            return
+        }
         val now = SystemClock.elapsedRealtime()
         val last = lastEvent.put(cam.host, now)
         val newVisit = last == null || now - last > VISIT_GAP_MS

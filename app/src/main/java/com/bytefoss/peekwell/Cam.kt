@@ -27,6 +27,8 @@ class Cam {
     @JvmField var kindsOff: MutableSet<String> = HashSet()
     // Its stable ID from ONVIF discovery, "" until learned: how it's found again when its address changes
     @JvmField var deviceId = ""
+    // Paused from the grid: no alerts from it until the user resumes them
+    @JvmField var isPaused = false
 
     /**
      * Moves the camera to a new address (its router gave it another IP), in the addresses it said it uses for events
@@ -79,6 +81,7 @@ class Cam {
                         // a camera saved before choices were per camera starts with the choice that was for all
                         kindsOff = cameraJson.optJSONArray("kinds_off")?.let { HashSet(readStrings(it)) } ?: getKindsOff(ctx)
                         deviceId = cameraJson.optString("device_id")
+                        isPaused = cameraJson.optBoolean("paused")
                     }
                 }
             } catch (ignored: JSONException) {
@@ -94,7 +97,7 @@ class Cam {
                 camerasJson.put(JSONObject().put("name", camera.name).put("host", camera.host).put("user", camera.user)
                     .put("pass", camera.pass).put("events", camera.eventsUrl).put("stream_hd", camera.streamUrlHd)
                     .put("stream_sd", camera.streamUrlSd).put("kinds", JSONArray(camera.kinds))
-                    .put("kinds_off", JSONArray(camera.kindsOff.sorted())).put("device_id", camera.deviceId))
+                    .put("kinds_off", JSONArray(camera.kindsOff.sorted())).put("device_id", camera.deviceId).put("paused", camera.isPaused))
             }
             getPrefs(ctx).edit().putString("cams", camerasJson.toString()).apply()
         }
@@ -234,6 +237,30 @@ class Cam {
 
         @JvmStatic
         fun setAlertPosition(ctx: Context, position: String) = getPrefs(ctx).edit().putString("alert_position", position).apply()
+
+        /** The pop-up's size: "small", "medium" (the default, 30% of the screen's width) or "large". */
+        @JvmStatic
+        fun getAlertSize(ctx: Context): String = getPrefs(ctx).getString("alert_size", "medium") ?: "medium"
+
+        @JvmStatic
+        fun setAlertSize(ctx: Context, size: String) = getPrefs(ctx).edit().putString("alert_size", size).apply()
+
+        /** Pause from Settings: every camera stays quiet for minutes, then alerts come back; 0 resumes them now. */
+        @JvmStatic
+        fun pauseAll(ctx: Context, minutes: Int) = getPrefs(ctx).edit()
+            .putLong("paused_until", if (minutes == 0) 0L else System.currentTimeMillis() + minutes * 60_000L)
+            .putInt("pause_minutes", minutes).apply()
+
+        /** Until when (System.currentTimeMillis) every camera is paused; 0 when it isn't, or the pause is over. */
+        @JvmStatic
+        fun getPausedUntil(ctx: Context): Long {
+            val until = getPrefs(ctx).getLong("paused_until", 0L)
+            return if (until > System.currentTimeMillis()) until else 0L
+        }
+
+        /** The pause chosen in Settings while it lasts, in minutes; 0 when there's none. */
+        @JvmStatic
+        fun getPauseMinutes(ctx: Context): Int = if (getPausedUntil(ctx) > 0) getPrefs(ctx).getInt("pause_minutes", 0) else 0
 
         private fun getPrefs(ctx: Context): SharedPreferences = ctx.getSharedPreferences("cams", Context.MODE_PRIVATE)
     }

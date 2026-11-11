@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
 import android.provider.Settings
+import android.text.format.DateFormat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -80,7 +81,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import java.util.Date
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.Lifecycle
@@ -102,11 +105,21 @@ private fun Grid() {
     var cams by remember { mutableStateOf(Cam.loadCameras(ctx)) }
     var alerts by remember { mutableStateOf(Cam.isAlertsOn(ctx)) }
     var overlayOk by remember { mutableStateOf(Settings.canDrawOverlays(ctx)) }
+    // what's paused is read again each half minute, so "paused until" goes once the time is up, and after each change
+    var pauseCheckedAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000)
+            pauseCheckedAt = System.currentTimeMillis()
+        }
+    }
+    val allPausedUntil = remember(pauseCheckedAt) { Cam.getPausedUntil(ctx) }
     // back from the camera's settings or full screen: reload, and (re)start alerts as the settings say
     LifecycleEventEffect(Lifecycle.Event.ON_START) {
         cams = Cam.loadCameras(ctx)
         alerts = Cam.isAlertsOn(ctx)
         overlayOk = Settings.canDrawOverlays(ctx)
+        pauseCheckedAt = System.currentTimeMillis()
         MotionService.syncService(ctx, false)
     }
     // streams only while the grid is on screen: the camera takes few at once, and full screen needs one
@@ -203,7 +216,11 @@ private fun Grid() {
         }
         // blank (but still a line tall, so the header doesn't jump) until there's a camera to count
         var sub = when (cams.size) { 0 -> ""; 1 -> "1 camera"; else -> "${cams.size} cameras" }
-        if (cams.isNotEmpty()) sub += if (alerts) " · Motion alerts on" else " · Motion alerts off"
+        if (cams.isNotEmpty()) sub += when {
+            !alerts -> " · Motion alerts off"
+            allPausedUntil > 0 -> " · Motion alerts paused until " + DateFormat.getTimeFormat(ctx).format(Date(allPausedUntil))
+            else -> " · Motion alerts on"
+        }
         if (alerts && cams.isNotEmpty() && !overlayOk) sub += " · Allow Display over other apps for pop-ups"
         Text(
             sub, Modifier.padding(top = 4.dp, bottom = 4.dp),
@@ -298,13 +315,24 @@ private fun Grid() {
                             cam.name, if (isLive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                             Modifier.align(Alignment.BottomStart).padding(14.dp),
                         )
-                        // alerts that are on but not working say so, rather than staying quiet
+                        // alerts that are on but not working say so, rather than staying quiet; not while the video has
+                        // failed too, whose message says much the same and would run into this label
                         val alertProblem = if (alerts) MotionService.alertProblems[cam.host] else null
+                        // read again after each change: the tile keeps the same camera object
+                        val isPaused = remember(pauseCheckedAt, cam) { cam.isPaused }
+                        // a paused camera says so; why its alerts don't work shows again once it's resumed
+                        androidx.compose.animation.AnimatedVisibility(
+                            alerts && isPaused, Modifier.align(Alignment.TopEnd).padding(14.dp),
+                            enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
+                            exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
+                        ) {
+                            StatusLabel("Alerts paused", MaterialTheme.colorScheme.outline, isSmall = true)
+                        }
                         var shownProblem by remember { mutableStateOf("") } // kept while it fades out
                         LaunchedEffect(alertProblem) { if (alertProblem != null) shownProblem = alertProblem }
                         // named in full: the grid's Column scope would otherwise pick its Column-only version
                         androidx.compose.animation.AnimatedVisibility(
-                            alertProblem != null, Modifier.align(Alignment.TopEnd).padding(14.dp),
+                            alertProblem != null && !isPaused && !isVideoFailed, Modifier.align(Alignment.TopEnd).padding(14.dp),
                             enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
                             exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
                         ) {
@@ -325,6 +353,13 @@ private fun Grid() {
                                 onEdit = {
                                     menuIndex = null
                                     ctx.startActivity(Intent(ctx, SetupActivity::class.java).putExtra("i", i))
+                                },
+                                isPaused = isPaused,
+                                onPause = {
+                                    closeActions()
+                                    cam.isPaused = !cam.isPaused
+                                    Cam.saveCameras(ctx, cams)
+                                    pauseCheckedAt = System.currentTimeMillis()
                                 },
                                 onDelete = {
                                     closeActions()
@@ -361,7 +396,7 @@ private fun Grid() {
             movingIndex != null -> listOf("◀ ▶ ▲ ▼" to "Move", "OK" to "Done", "Back" to "Cancel")
             menuIndex != null -> listOf("◀ ▶" to "Choose", "OK" to focusedAction, "Back" to "Close")
             isSettingsFocused -> listOf("OK" to "Open settings")
-            lastFocus < cams.size -> listOf("OK" to "Full screen", "Hold OK" to "Move, edit or delete")
+            lastFocus < cams.size -> listOf("OK" to "Full screen", "Hold OK" to "Move, edit, pause or delete")
             else -> listOf("OK" to "Add a camera")
         }
         val motion = MaterialTheme.motionScheme
@@ -415,7 +450,8 @@ private fun Tile(
  */
 @Composable
 private fun BoxScope.TileActions(
-    onFocusAction: (String) -> Unit, onClose: () -> Unit, onMove: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit,
+    onFocusAction: (String) -> Unit, onClose: () -> Unit, onMove: () -> Unit, onEdit: () -> Unit, isPaused: Boolean,
+    onPause: () -> Unit, onDelete: () -> Unit,
 ) {
     var isOkPressedHere by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
@@ -423,6 +459,8 @@ private fun BoxScope.TileActions(
     Box(Modifier.matchParentSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f)))
     val actions = listOf(
         Triple("Move", R.drawable.ic_move, onMove), Triple("Edit", R.drawable.ic_edit, onEdit),
+        if (isPaused) Triple("Resume alerts", R.drawable.ic_alerts, onPause)
+        else Triple("Pause alerts", R.drawable.ic_alerts_off, onPause),
         Triple("Delete", R.drawable.ic_delete, onDelete),
     )
     Row(
@@ -439,7 +477,7 @@ private fun BoxScope.TileActions(
             if (keyEvent.type == KeyEventType.KeyDown && keyEvent.nativeKeyEvent.repeatCount == 0) isOkPressedHere = true
             !isOkPressedHere
         },
-        horizontalArrangement = Arrangement.spacedBy(32.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         actions.forEachIndexed { k, (label, icon, onClick) ->
             val isDelete = label == "Delete"
