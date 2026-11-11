@@ -35,6 +35,7 @@
             android:windowSoftInputMode="adjustResize" />
         <activity android:name=".SettingsActivity" android:exported="false" />
         <activity android:name=".ReportActivity" android:exported="false" />
+        <activity android:name=".LicensesActivity" android:exported="false" />
 
         <!-- Runs only while the user has Motion alerts on: it long-polls the cameras' ONVIF events on the LAN. -->
         <service android:name=".MotionService" android:exported="false"

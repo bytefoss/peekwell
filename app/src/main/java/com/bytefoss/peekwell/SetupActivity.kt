@@ -108,6 +108,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -179,18 +180,125 @@ class SettingsActivity : ComponentActivity() {
                             color = MaterialTheme.colorScheme.error)
                     }
                     Heading("Help")
+                    var isSourceShown by remember { mutableStateOf(false) }
                     SegmentedGroup {
-                        val shapes = ListItemDefaults.segmentedShapes(0, 1)
-                        SegmentedListItem(
-                            onClick = { startActivity(Intent(this@SettingsActivity, ReportActivity::class.java)) },
-                            shapes = shapes, modifier = Modifier.focusIndicator(shapes.focusedShape, isInside = true),
-                            supportingContent = { Text("Checks your cameras and shows a report you can send from your phone") },
-                        ) { Text("Report a problem") }
+                        listOf(
+                            Triple("Report a problem", "Checks your cameras and shows a report you can send from your phone") {
+                                startActivity(Intent(this@SettingsActivity, ReportActivity::class.java))
+                            },
+                            Triple("Source code", "Peekwell is open source: ${SOURCE_URL.removePrefix("https://")}") { isSourceShown = true },
+                            Triple("Open source licenses", "The libraries Peekwell is built with") {
+                                startActivity(Intent(this@SettingsActivity, LicensesActivity::class.java))
+                            },
+                        ).forEachIndexed { i, (title, description, onClick) ->
+                            val shapes = ListItemDefaults.segmentedShapes(i, 3)
+                            SegmentedListItem(
+                                onClick = onClick, shapes = shapes,
+                                modifier = Modifier.focusIndicator(shapes.focusedShape, isInside = true),
+                                supportingContent = { Text(description) },
+                            ) { Text(title) }
+                        }
                     }
+                    if (isSourceShown) SourceCodeDialog { isSourceShown = false }
                 }
             }
         }
     }
+}
+
+/** Where the source lives, as a QR code: most TVs have no browser to open a link in. */
+@Composable
+private fun SourceCodeDialog(onDismiss: () -> Unit) {
+    val closeFocus = remember { FocusRequester() }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Source code") },
+        text = {
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                val qrCode = remember { Report.makeQrCode(SOURCE_URL, 400).asImageBitmap() }
+                Image(qrCode, "QR code that opens Peekwell's source code", Modifier.size(200.dp))
+                Text("Scan with your phone to see Peekwell's code on GitHub, or go to\n${SOURCE_URL.removePrefix("https://")}\n\n" +
+                    "It's free and open source under the Apache License 2.0.")
+            }
+        },
+        confirmButton = {
+            FilledTonalButton(onClick = onDismiss, modifier = Modifier.focusRequester(closeFocus).focusIndicator(CircleShape)) {
+                Text("Close")
+            }
+        },
+    )
+    LaunchedEffect(Unit) { runCatching { closeFocus.requestFocus() } }
+}
+
+/** Open source licenses: the libraries in the app and the license they're under (all Apache 2.0, like the app). */
+class LicensesActivity : ComponentActivity() {
+    override fun onCreate(state: Bundle?) {
+        super.onCreate(state)
+        val licenseText = resources.openRawResource(R.raw.apache_license).bufferedReader().use { it.readText() }
+        setContent {
+            CamTheme {
+                val backFocus = remember { FocusRequester() }
+                val textFocus = remember { FocusRequester() }
+                Column(
+                    Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 96.dp, vertical = 40.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Open source licenses", Modifier.weight(1f), style = MaterialTheme.typography.headlineLargeEmphasized,
+                            color = MaterialTheme.colorScheme.onSurface)
+                        Action("Back", modifier = Modifier.focusRequester(backFocus).focusProperties { down = textFocus }) { finish() }
+                    }
+                    ScrollingText(
+                        LIBRARIES + "\n\n" + licenseText,
+                        Modifier.padding(top = 16.dp).focusRequester(textFocus),
+                        MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                LaunchedEffect(Unit) { runCatching { backFocus.requestFocus() } }
+            }
+        }
+    }
+
+    companion object {
+        // every library in the release build (gradlew :app:dependencies); check again when one is added
+        private const val LIBRARIES = """Peekwell is open source under the Apache License 2.0, and is built with these open source libraries, all under the Apache License 2.0 too:
+
+• Android Jetpack (AndroidX): Compose, Material 3, Activity, Lifecycle, Core and more, by The Android Open Source Project
+• Media3 ExoPlayer, with RTSP, by The Android Open Source Project
+• Guava, by Google
+• Kotlin standard library, kotlinx.coroutines and kotlinx.serialization, by JetBrains
+• JetBrains Java Annotations, by JetBrains
+• JSpecify, by the JSpecify authors
+• ZXing, by the ZXing authors
+
+The license:"""
+    }
+}
+
+/**
+ * Text longer than the screen that the remote scrolls: it takes focus, then Down and Up scroll it, and Up at its top
+ * moves focus on up.
+ */
+@Composable
+private fun ScrollingText(text: String, modifier: Modifier, style: TextStyle) {
+    val scroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    Text(
+        text,
+        modifier.focusIndicator(MaterialTheme.shapes.small)
+            .onPreviewKeyEvent { keyEvent ->
+                if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                val step = when (keyEvent.key) {
+                    Key.DirectionDown -> 240f
+                    Key.DirectionUp -> if (scroll.value == 0) return@onPreviewKeyEvent false else -240f
+                    else -> return@onPreviewKeyEvent false
+                }
+                scope.launch { scroll.animateScrollBy(step) }
+                true
+            }
+            .focusable().verticalScroll(scroll).padding(12.dp),
+        style = style,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /**
@@ -256,25 +364,9 @@ private fun ProblemReport(ctx: ComponentActivity) {
             return@Column
         }
         Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-            // focusable, so Up and Down scroll a report longer than the screen; Up at its top goes on to Check again
-            val reportScroll = rememberScrollState()
-            Text(
-                shownReport,
-                Modifier.weight(1f).focusRequester(reportFocus).focusIndicator(MaterialTheme.shapes.small)
-                    .onPreviewKeyEvent { keyEvent ->
-                        if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                        val step = when (keyEvent.key) {
-                            Key.DirectionDown -> 240f
-                            Key.DirectionUp -> if (reportScroll.value == 0) return@onPreviewKeyEvent false else -240f
-                            else -> return@onPreviewKeyEvent false
-                        }
-                        scope.launch { reportScroll.animateScrollBy(step) }
-                        true
-                    }
-                    .focusable().verticalScroll(reportScroll).padding(12.dp),
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // Up at the report's top goes on to Check again
+            ScrollingText(shownReport, Modifier.weight(1f).focusRequester(reportFocus),
+                MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
             Column(Modifier.width(300.dp)) {
                 val qrCode = remember(shownReport) { Report.makeQrCode(Report.buildIssueUrl(shownReport), 600).asImageBitmap() }
                 Image(qrCode, "QR code that opens this report as a GitHub issue", Modifier.size(300.dp))
@@ -1122,6 +1214,8 @@ private fun Action(text: String, isPrimary: Boolean = false, modifier: Modifier 
 @Composable
 private fun Heading(text: String, topPadding: Dp = 32.dp) = Text(text, Modifier.padding(top = topPadding),
     style = MaterialTheme.typography.titleLargeEmphasized, color = MaterialTheme.colorScheme.onSurface)
+
+internal const val SOURCE_URL = "https://github.com/bytefoss/peekwell"
 
 // About 75 characters of body text: longer lines are hard to read from across a room
 private val TEXT_WIDTH = 560.dp

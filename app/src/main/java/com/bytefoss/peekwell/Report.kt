@@ -39,7 +39,7 @@ import kotlin.coroutines.resume
  * full address: a camera's address becomes "camera", any other address keeps only its last number.
  */
 object Report {
-    private const val ISSUES_URL = "https://github.com/bytefoss/peekwell/issues/new"
+    private const val ISSUES_URL = "$SOURCE_URL/issues/new"
     private const val MAX_URL_BYTES = 1500 // a QR code a phone still reads off a TV across the room
     private const val VIDEO_TEST_MS = 12_000L
     private val IPV4 = Regex("""\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\b""")
