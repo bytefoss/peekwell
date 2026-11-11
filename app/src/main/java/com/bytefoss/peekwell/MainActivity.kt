@@ -491,19 +491,19 @@ private fun BoxScope.TileActions(
         actions.forEachIndexed { k, (label, icon, onClick) ->
             val isDelete = label == "Delete"
             // each button grows in a beat after the one before it, left to right
-            val appear = remember { Animatable(0f) }
-            val spatialSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+            val appearProgress = remember { Animatable(0f) }
+            val appearSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
             LaunchedEffect(Unit) {
                 delay(40L * k)
-                appear.animateTo(1f, spatialSpec)
+                appearProgress.animateTo(1f, appearSpec)
             }
             FilledTonalIconButton(
                 onClick = onClick,
                 modifier = (if (k == 0) Modifier.focusRequester(firstFocus) else Modifier).size(72.dp)
                     .graphicsLayer {
-                        scaleX = 0.6f + 0.4f * appear.value
+                        scaleX = 0.6f + 0.4f * appearProgress.value
                         scaleY = scaleX
-                        alpha = appear.value.coerceIn(0f, 1f)
+                        alpha = appearProgress.value.coerceIn(0f, 1f)
                     }
                     .focusProperties {
                         up = FocusRequester.Cancel

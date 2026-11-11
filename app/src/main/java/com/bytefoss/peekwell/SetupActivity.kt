@@ -757,16 +757,16 @@ private fun AddCamera(activity: ComponentActivity, cams: MutableList<Cam>) {
         // the new step slides in from the right going forward, from the left going back. Only the new one moves: a
         // crossfade would keep the old step's fields, which share focus targets with the new ones, on screen meanwhile
         var previousStep by remember { mutableIntStateOf(step) }
-        val stepEnter = remember(step) { Animatable(if (step == previousStep) 1f else 0f) }
+        val stepEnterProgress = remember(step) { Animatable(if (step == previousStep) 1f else 0f) }
         val isForward = step >= previousStep
         val stepSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
         LaunchedEffect(step) {
-            stepEnter.animateTo(1f, stepSpec)
+            stepEnterProgress.animateTo(1f, stepSpec)
             previousStep = step
         }
         Column(Modifier.graphicsLayer {
-            alpha = stepEnter.value.coerceIn(0f, 1f)
-            translationX = (1f - stepEnter.value) * 64.dp.toPx() * (if (isForward) 1f else -1f)
+            alpha = stepEnterProgress.value.coerceIn(0f, 1f)
+            translationX = (1f - stepEnterProgress.value) * 64.dp.toPx() * (if (isForward) 1f else -1f)
         }) {
             when (step) {
                 1 -> {
@@ -1050,7 +1050,7 @@ private fun AlertSettings(ctx: Context, askOverlayPermission: () -> Unit) {
     val pauseMinutes = remember { mutableStateOf(Cam.getPauseMinutes(ctx).toString()) }
     var pausedUntil by remember { mutableLongStateOf(Cam.getPausedUntil(ctx)) }
     Connected(listOf("0" to "Off", "30" to "30 min", "60" to "1 hour", "180" to "3 hours", "480" to "8 hours"), pauseMinutes) {
-        Cam.pauseAll(ctx, it.toInt())
+        Cam.pauseAllAlerts(ctx, it.toInt())
         pausedUntil = Cam.getPausedUntil(ctx)
     }
     Hint(

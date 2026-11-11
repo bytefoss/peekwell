@@ -167,21 +167,19 @@ class Overlay(private val ctx: Context) {
                                         Log.i("peekwell", "${card.cam.host}: popup video in ${SystemClock.elapsedRealtime() - card.openedAt} ms")
                                     })
                                     if (isTimerShown) {
-                                        // the time left before it closes, as a thin line along the bottom edge (the card's
-                                        // rounded corners clip it). While someone stays in view the camera reports about
-                                        // every second and the card stays up: the line holds still, full. It runs out only
-                                        // once the reports stop, ending as the card slides away; a report meanwhile refills it
-                                        val timeLeft = remember { Animatable(1f) }
+                                        // the time left before it closes, as a line along the bottom edge: full and still while
+                                        // the camera keeps reporting, running out once it stops, refilled by a new report
+                                        val timeLeftFraction = remember { Animatable(1f) }
                                         val refillSpec = motion.fastSpatialSpec<Float>()
                                         LaunchedEffect(card.reportedAt) {
-                                            timeLeft.animateTo(1f, refillSpec)
+                                            timeLeftFraction.animateTo(1f, refillSpec)
                                             delay(QUIET_MS)
                                             val remainingMs = LINGER_MS - (SystemClock.elapsedRealtime() - card.reportedAt)
-                                            timeLeft.animateTo(0f, tween(remainingMs.coerceAtLeast(0L).toInt(), easing = LinearEasing))
+                                            timeLeftFraction.animateTo(0f, tween(remainingMs.coerceAtLeast(0L).toInt(), easing = LinearEasing))
                                         }
                                         // in the app's accent, the same for every detection: what was detected is the tag's to say
                                         Box(
-                                            Modifier.align(Alignment.BottomStart).fillMaxWidth(timeLeft.value.coerceIn(0f, 1f))
+                                            Modifier.align(Alignment.BottomStart).fillMaxWidth(timeLeftFraction.value.coerceIn(0f, 1f))
                                                 .height(3.dp).background(MaterialTheme.colorScheme.primary),
                                         )
                                     }

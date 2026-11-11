@@ -254,7 +254,7 @@ class Cam {
 
         /** Pause from Settings: every camera stays quiet for minutes, then alerts come back; 0 resumes them now. */
         @JvmStatic
-        fun pauseAll(ctx: Context, minutes: Int) = getPrefs(ctx).edit()
+        fun pauseAllAlerts(ctx: Context, minutes: Int) = getPrefs(ctx).edit()
             .putLong("paused_until", if (minutes == 0) 0L else System.currentTimeMillis() + minutes * 60_000L)
             .putInt("pause_minutes", minutes).apply()
 
