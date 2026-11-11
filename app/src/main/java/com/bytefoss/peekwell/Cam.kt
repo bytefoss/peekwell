@@ -231,6 +231,13 @@ class Cam {
         @JvmStatic
         fun setShowLabel(ctx: Context, on: Boolean) = getPrefs(ctx).edit().putBoolean("show_label", on).apply()
 
+        /** Whether the pop-up shows a thin line along its bottom that runs out as its time does. On by default. */
+        @JvmStatic
+        fun isTimerShown(ctx: Context): Boolean = getPrefs(ctx).getBoolean("show_timer", true)
+
+        @JvmStatic
+        fun setShowTimer(ctx: Context, on: Boolean) = getPrefs(ctx).edit().putBoolean("show_timer", on).apply()
+
         /** The pop-up's corner: "bottom_right" (the default), "bottom_left", "top_right" or "top_left". */
         @JvmStatic
         fun getAlertPosition(ctx: Context): String = getPrefs(ctx).getString("alert_position", "bottom_right") ?: "bottom_right"

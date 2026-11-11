@@ -11,7 +11,10 @@ import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,18 +22,25 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
@@ -44,6 +54,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import kotlinx.coroutines.delay
 
 /**
  * The alert popups, in the corner chosen in Settings (bottom right by default) over whatever is on screen: one card per camera that's reporting, each
@@ -64,7 +75,7 @@ class Overlay(private val ctx: Context) {
         val kind = mutableStateOf(kind)
         val visible = MutableTransitionState(false).apply { targetState = true } // slides in once composed
         val openedAt = SystemClock.elapsedRealtime()
-        var reportedAt = openedAt
+        var reportedAt by mutableLongStateOf(openedAt) // the time-left line refills on each report
         var closingAt = 0L
         val linger = Runnable { closeCard(this) }
     }
@@ -117,6 +128,7 @@ class Overlay(private val ctx: Context) {
         val verticalMargin = displayMetrics.heightPixels / 20
         val isNamed = Cam.loadCameras(ctx).size > 1 // the camera's name only helps with more than one
         val isLabelShown = Cam.isLabelShown(ctx)
+        val isTimerShown = Cam.isTimerShown(ctx)
         val position = Cam.getAlertPosition(ctx)
         val isTop = position.startsWith("top")
         val isLeft = position.endsWith("left")
@@ -154,6 +166,25 @@ class Overlay(private val ctx: Context) {
                                     LiveVideo(card.cam, hd = false, Modifier.fillMaxSize(), onFirstFrame = {
                                         Log.i("peekwell", "${card.cam.host}: popup video in ${SystemClock.elapsedRealtime() - card.openedAt} ms")
                                     })
+                                    if (isTimerShown) {
+                                        // the time left before it closes, as a thin line along the bottom edge (the card's
+                                        // rounded corners clip it). While someone stays in view the camera reports about
+                                        // every second and the card stays up: the line holds still, full. It runs out only
+                                        // once the reports stop, ending as the card slides away; a report meanwhile refills it
+                                        val timeLeft = remember { Animatable(1f) }
+                                        val refillSpec = motion.fastSpatialSpec<Float>()
+                                        LaunchedEffect(card.reportedAt) {
+                                            timeLeft.animateTo(1f, refillSpec)
+                                            delay(QUIET_MS)
+                                            val remainingMs = LINGER_MS - (SystemClock.elapsedRealtime() - card.reportedAt)
+                                            timeLeft.animateTo(0f, tween(remainingMs.coerceAtLeast(0L).toInt(), easing = LinearEasing))
+                                        }
+                                        // in the app's accent, the same for every detection: what was detected is the tag's to say
+                                        Box(
+                                            Modifier.align(Alignment.BottomStart).fillMaxWidth(timeLeft.value.coerceIn(0f, 1f))
+                                                .height(3.dp).background(MaterialTheme.colorScheme.primary),
+                                        )
+                                    }
                                     // A small label at the bottom: the picture is small, and many cameras stamp the
                                     // date and time at the top left
                                     if (isLabelShown) {
@@ -232,6 +263,7 @@ class Overlay(private val ctx: Context) {
 
     companion object {
         private const val LINGER_MS = 20_000L
+        private const val QUIET_MS = 3_000L // no report for this long: whatever was in view has left, the line starts to run out
         private const val MAX_CARDS = 2
     }
 }

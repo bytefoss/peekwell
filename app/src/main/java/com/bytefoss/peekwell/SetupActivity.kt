@@ -1026,17 +1026,23 @@ private fun AlertSettings(ctx: Context, askOverlayPermission: () -> Unit) {
     Heading("Alerts")
     var isAlertsOn by remember { mutableStateOf(Cam.isAlertsOn(ctx)) }
     var isLabelShown by remember { mutableStateOf(Cam.isLabelShown(ctx)) }
+    var isTimerShown by remember { mutableStateOf(Cam.isTimerShown(ctx)) }
     SegmentedGroup {
-        SwitchItem("Motion alerts", "Shows a live picture over any app when a camera detects something", isAlertsOn, 0, 2) { isOn ->
+        SwitchItem("Motion alerts", "Shows a live picture over any app when a camera detects something", isAlertsOn, 0, 3) { isOn ->
             isAlertsOn = isOn
             Cam.setAlerts(ctx, isOn)
             if (isOn && !Settings.canDrawOverlays(ctx)) askOverlayPermission()
             MotionService.syncService(ctx, false)
         }
         SwitchItem("Show what was detected", "A small tag at the bottom of the preview",
-            isLabelShown, 1, 2) { isOn ->
+            isLabelShown, 1, 3) { isOn ->
             isLabelShown = isOn
             Cam.setShowLabel(ctx, isOn)
+        }
+        SwitchItem("Show time left", "A thin line at the bottom of the preview that runs out before it closes",
+            isTimerShown, 2, 3) { isOn ->
+            isTimerShown = isOn
+            Cam.setShowTimer(ctx, isOn)
         }
     }
 
