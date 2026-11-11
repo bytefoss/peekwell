@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.SurfaceView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -212,7 +214,12 @@ fun LiveVideo(
         var waitingText by remember { mutableStateOf<String?>("Connecting…") }
         var isFailed by remember { mutableStateOf(false) }
         var shownLive by remember { mutableStateOf<Live?>(null) }
+        // the picture fades in the first time it arrives, rather than appearing at once; a full screen SurfaceView
+        // draws in its own layer, which a fade can't reach
+        var hasPicture by remember { mutableStateOf(surface) }
+        val pictureAlpha by animateFloatAsState(if (hasPicture) 1f else 0f, MaterialTheme.motionScheme.slowEffectsSpec())
         fun showLive() {
+            hasPicture = true
             waitingText = null
             if (isFailed) onFailed(false)
             isFailed = false
@@ -270,7 +277,7 @@ fun LiveVideo(
                     videoView
                 },
                 onRelease = { (it.tag as Live).release() },
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = pictureAlpha },
             )
             VideoWaiting(waitingText, isFailed, failedAction)
         }

@@ -11,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeIn
@@ -342,30 +343,36 @@ private fun Grid() {
                                 isSmall = true,
                             )
                         }
-                        if (menuIndex == i) {
-                            TileActions(
-                                onFocusAction = { focusedAction = it }, onClose = ::closeActions,
-                                onMove = {
-                                    menuIndex = null
-                                    orderBeforeMove = cams.toList()
-                                    movingIndex = i
-                                },
-                                onEdit = {
-                                    menuIndex = null
-                                    ctx.startActivity(Intent(ctx, SetupActivity::class.java).putExtra("i", i))
-                                },
-                                isPaused = isPaused,
-                                onPause = {
-                                    closeActions()
-                                    cam.isPaused = !cam.isPaused
-                                    Cam.saveCameras(ctx, cams)
-                                    pauseCheckedAt = System.currentTimeMillis()
-                                },
-                                onDelete = {
-                                    closeActions()
-                                    deleteIndex = i
-                                },
-                            )
+                        androidx.compose.animation.AnimatedVisibility(
+                            menuIndex == i, Modifier.matchParentSize(),
+                            enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
+                            exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
+                        ) {
+                            Box(Modifier.fillMaxSize()) {
+                                TileActions(
+                                    isShown = menuIndex == i, onFocusAction = { focusedAction = it }, onClose = ::closeActions,
+                                    onMove = {
+                                        menuIndex = null
+                                        orderBeforeMove = cams.toList()
+                                        movingIndex = i
+                                    },
+                                    onEdit = {
+                                        menuIndex = null
+                                        ctx.startActivity(Intent(ctx, SetupActivity::class.java).putExtra("i", i))
+                                    },
+                                    isPaused = isPaused,
+                                    onPause = {
+                                        closeActions()
+                                        cam.isPaused = !cam.isPaused
+                                        Cam.saveCameras(ctx, cams)
+                                        pauseCheckedAt = System.currentTimeMillis()
+                                    },
+                                    onDelete = {
+                                        closeActions()
+                                        deleteIndex = i
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -450,7 +457,7 @@ private fun Tile(
  */
 @Composable
 private fun BoxScope.TileActions(
-    onFocusAction: (String) -> Unit, onClose: () -> Unit, onMove: () -> Unit, onEdit: () -> Unit, isPaused: Boolean,
+    isShown: Boolean, onFocusAction: (String) -> Unit, onClose: () -> Unit, onMove: () -> Unit, onEdit: () -> Unit, isPaused: Boolean,
     onPause: () -> Unit, onDelete: () -> Unit,
 ) {
     var isOkPressedHere by remember { mutableStateOf(false) }
@@ -465,6 +472,8 @@ private fun BoxScope.TileActions(
     )
     Row(
         Modifier.align(Alignment.Center).onPreviewKeyEvent { keyEvent ->
+            // fading out after a choice: no second choice (Move lifts the tile, and the grid above takes its arrows first)
+            if (!isShown) return@onPreviewKeyEvent true
             // Back closes them here: left to Compose, the first Back would only take focus off the buttons
             if (keyEvent.key == Key.Back) {
                 if (keyEvent.type == KeyEventType.KeyUp) onClose()
@@ -481,9 +490,21 @@ private fun BoxScope.TileActions(
     ) {
         actions.forEachIndexed { k, (label, icon, onClick) ->
             val isDelete = label == "Delete"
+            // each button grows in a beat after the one before it, left to right
+            val appear = remember { Animatable(0f) }
+            val spatialSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+            LaunchedEffect(Unit) {
+                delay(40L * k)
+                appear.animateTo(1f, spatialSpec)
+            }
             FilledTonalIconButton(
                 onClick = onClick,
                 modifier = (if (k == 0) Modifier.focusRequester(firstFocus) else Modifier).size(72.dp)
+                    .graphicsLayer {
+                        scaleX = 0.6f + 0.4f * appear.value
+                        scaleY = scaleX
+                        alpha = appear.value.coerceIn(0f, 1f)
+                    }
                     .focusProperties {
                         up = FocusRequester.Cancel
                         down = FocusRequester.Cancel

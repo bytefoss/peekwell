@@ -16,6 +16,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -97,6 +98,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -752,93 +754,108 @@ private fun AddCamera(activity: ComponentActivity, cams: MutableList<Cam>) {
                 }
             }
         }
-        when (step) {
-            1 -> {
-                StatusRow(status, isProblem, isWaiting)
-                // the cameras found, then always a way to type an address
-                val rowCount = found.size + 1
-                SegmentedGroup(Modifier.padding(top = 8.dp)) {
-                    found.forEachIndexed { i, (address, cameraModel, cameraId) ->
-                        val shapes = ListItemDefaults.segmentedShapes(i, rowCount)
-                        val isAdded = cams.any { it.host == address }
+        // the new step slides in from the right going forward, from the left going back. Only the new one moves: a
+        // crossfade would keep the old step's fields, which share focus targets with the new ones, on screen meanwhile
+        var previousStep by remember { mutableIntStateOf(step) }
+        val stepEnter = remember(step) { Animatable(if (step == previousStep) 1f else 0f) }
+        val isForward = step >= previousStep
+        val stepSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+        LaunchedEffect(step) {
+            stepEnter.animateTo(1f, stepSpec)
+            previousStep = step
+        }
+        Column(Modifier.graphicsLayer {
+            alpha = stepEnter.value.coerceIn(0f, 1f)
+            translationX = (1f - stepEnter.value) * 64.dp.toPx() * (if (isForward) 1f else -1f)
+        }) {
+            when (step) {
+                1 -> {
+                    StatusRow(status, isProblem, isWaiting)
+                    // the cameras found, then always a way to type an address
+                    val rowCount = found.size + 1
+                    SegmentedGroup(Modifier.padding(top = 8.dp)) {
+                        found.forEachIndexed { i, (address, cameraModel, cameraId) ->
+                            val shapes = ListItemDefaults.segmentedShapes(i, rowCount)
+                            val isAdded = cams.any { it.host == address }
+                            SegmentedListItem(
+                                onClick = { pickCamera(address, cameraModel, cameraId) }, shapes = shapes,
+                                modifier = (if (i == 0) Modifier.focusRequester(firstFocus) else Modifier)
+                                    .focusIndicator(shapes.focusedShape, isInside = true),
+                                supportingContent = { Text(if (isAdded) "Already added" else address) },
+                            ) { Text(cameraModel.ifEmpty { address }) }
+                        }
+                        val manualShapes = ListItemDefaults.segmentedShapes(found.size, rowCount)
                         SegmentedListItem(
-                            onClick = { pickCamera(address, cameraModel, cameraId) }, shapes = shapes,
-                            modifier = (if (i == 0) Modifier.focusRequester(firstFocus) else Modifier)
-                                .focusIndicator(shapes.focusedShape, isInside = true),
-                            supportingContent = { Text(if (isAdded) "Already added" else address) },
-                        ) { Text(cameraModel.ifEmpty { address }) }
+                            selected = isManual, onClick = { isManual = true }, shapes = manualShapes,
+                            modifier = Modifier.focusRequester(manualFocus).focusIndicator(manualShapes.focusedShape, isInside = true),
+                            supportingContent = { Text("When you know the camera's address") },
+                        ) { Text("Enter address manually") }
                     }
-                    val manualShapes = ListItemDefaults.segmentedShapes(found.size, rowCount)
-                    SegmentedListItem(
-                        selected = isManual, onClick = { isManual = true }, shapes = manualShapes,
-                        modifier = Modifier.focusRequester(manualFocus).focusIndicator(manualShapes.focusedShape, isInside = true),
-                        supportingContent = { Text("When you know the camera's address") },
-                    ) { Text("Enter address manually") }
-                }
-                if (isManual) {
-                    Field(
-                        "Camera address", ADDRESS_EXAMPLE, hostField,
-                        Modifier.focusRequester(firstFocus).focusProperties { down = mainButtonFocus }, KeyboardType.Uri,
-                        onDone = ::submitAddress,
-                    )
-                }
-                FlowRow(Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (isManual) {
-                        Action("Next", isPrimary = true, Modifier.focusRequester(mainButtonFocus), ::submitAddress)
+                        Field(
+                            "Camera address", ADDRESS_EXAMPLE, hostField,
+                            Modifier.focusRequester(firstFocus).focusProperties { down = mainButtonFocus }, KeyboardType.Uri,
+                            onDone = ::submitAddress,
+                        )
                     }
-                    Action("Scan again") { scanForCameras() }
+                    FlowRow(Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (isManual) {
+                            Action("Next", isPrimary = true, Modifier.focusRequester(mainButtonFocus), ::submitAddress)
+                        }
+                        Action("Scan again") { scanForCameras() }
+                    }
                 }
-            }
-            2 -> {
-                Hint(LOGIN_HINT)
-                Field("Username", "", userField, Modifier.focusRequester(firstFocus))
-                Field(
-                    "Password", "", passField, Modifier.focusRequester(passwordFocus).focusProperties { down = mainButtonFocus },
-                    keyboard = KeyboardType.Password, isSecret = true, isRevealed = isPasswordShown, onDone = { connect() },
-                )
-                ShowPasswordChip(isPasswordShown) { isPasswordShown = it }
-                FlowRow(Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Action("Connect", isPrimary = true, Modifier.focusRequester(mainButtonFocus)) { connect() }
+                2 -> {
+                    Hint(LOGIN_HINT)
+                    Field("Username", "", userField, Modifier.focusRequester(firstFocus))
+                    Field(
+                        "Password", "", passField, Modifier.focusRequester(passwordFocus).focusProperties { down = mainButtonFocus },
+                        keyboard = KeyboardType.Password, isSecret = true, isRevealed = isPasswordShown, onDone = { connect() },
+                    )
+                    ShowPasswordChip(isPasswordShown) { isPasswordShown = it }
+                    FlowRow(Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Action("Connect", isPrimary = true, Modifier.focusRequester(mainButtonFocus)) { connect() }
+                    }
+                    // a shortcut for a camera sharing a login already saved: one OK press, the password never shown
+                    if (savedLogins.isNotEmpty()) {
+                        Heading("Or use a saved login", topPadding = 24.dp)
+                        FlowRow(
+                            Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            savedLogins.forEach { (login, names) ->
+                                FilterChip(
+                                    selected = false, onClick = { connect(login) },
+                                    label = { Text("${login.first} · ${listCameraNames(names)}") },
+                                    modifier = Modifier.focusIndicator(FilterChipDefaults.shape),
+                                )
+                            }
+                        }
+                    }
+                    StatusRow(status, isProblem, isWaiting)
                 }
-                // a shortcut for a camera sharing a login already saved: one OK press, the password never shown
-                if (savedLogins.isNotEmpty()) {
-                    Heading("Or use a saved login", topPadding = 24.dp)
+                else -> {
+                    Heading("Name", topPadding = 16.dp)
                     FlowRow(
                         Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        savedLogins.forEach { (login, names) ->
+                        (NAME_CHOICES + OTHER_NAME).forEachIndexed { i, name ->
                             FilterChip(
-                                selected = false, onClick = { connect(login) },
-                                label = { Text("${login.first} · ${listCameraNames(names)}") },
-                                modifier = Modifier.focusIndicator(FilterChipDefaults.shape),
+                                selected = chosenName == name,
+                                onClick = { chosenName = if (chosenName == name) null else name },
+                                label = { Text(name) },
+                                modifier = (if (i == 0) Modifier.focusRequester(firstFocus) else Modifier)
+                                    .focusIndicator(FilterChipDefaults.shape),
                             )
                         }
                     }
-                }
-                StatusRow(status, isProblem, isWaiting)
-            }
-            else -> {
-                Heading("Name", topPadding = 16.dp)
-                FlowRow(
-                    Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    (NAME_CHOICES + OTHER_NAME).forEachIndexed { i, name ->
-                        FilterChip(
-                            selected = chosenName == name,
-                            onClick = { chosenName = if (chosenName == name) null else name },
-                            label = { Text(name) },
-                            modifier = (if (i == 0) Modifier.focusRequester(firstFocus) else Modifier)
-                                .focusIndicator(FilterChipDefaults.shape),
-                        )
+                    if (chosenName == OTHER_NAME) Field("Name", "Back yard", otherNameField)
+                    Heading("Alert on the TV for", topPadding = 16.dp)
+                    KindChips(camera.listKinds(), kindsSwitchedOff)
+                    FlowRow(Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Action("Add camera", isPrimary = true) { addCamera() }
                     }
-                }
-                if (chosenName == OTHER_NAME) Field("Name", "Back yard", otherNameField)
-                Heading("Alert on the TV for", topPadding = 16.dp)
-                KindChips(camera.listKinds(), kindsSwitchedOff)
-                FlowRow(Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Action("Add camera", isPrimary = true) { addCamera() }
                 }
             }
         }

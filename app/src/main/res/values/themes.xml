@@ -7,5 +7,14 @@
         <item name="android:colorAccent">@color/primary</item>
         <!-- the TV launcher's opening animation, in the app's night tone -->
         <item name="android:colorPrimary">@color/background</item>
+        <!-- screens fade into each other instead of the TV's default, which jumps on many sets -->
+        <item name="android:windowAnimationStyle">@style/ScreenFade</item>
+    </style>
+
+    <style name="ScreenFade" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/screen_enter</item>
+        <item name="android:activityOpenExitAnimation">@anim/screen_hold</item>
+        <item name="android:activityCloseEnterAnimation">@anim/screen_hold</item>
+        <item name="android:activityCloseExitAnimation">@anim/screen_exit</item>
     </style>
 </resources>

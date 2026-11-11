@@ -9,6 +9,7 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.expandVertically
@@ -17,6 +18,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -155,13 +157,19 @@ class Overlay(private val ctx: Context) {
                                     // A small label at the bottom: the picture is small, and many cameras stamp the
                                     // date and time at the top left
                                     if (isLabelShown) {
-                                        val shownKind = card.kind.value
-                                        StatusLabel(
-                                            if (isNamed) "$shownKind · ${card.cam.name}" else shownKind,
-                                            if (shownKind == "Person") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
+                                        // "Motion" turning into "Person" crossfades rather than jumping
+                                        AnimatedContent(
+                                            card.kind.value,
                                             Modifier.align(Alignment.BottomStart).padding(with(density) { (cardHeight / 24).toDp() }),
-                                            isSmall = true, isCompact = alertSize == "small",
-                                        )
+                                            transitionSpec = { fadeIn(motion.defaultEffectsSpec()) togetherWith fadeOut(motion.fastEffectsSpec()) },
+                                            contentAlignment = Alignment.BottomStart,
+                                        ) { shownKind ->
+                                            StatusLabel(
+                                                if (isNamed) "$shownKind · ${card.cam.name}" else shownKind,
+                                                if (shownKind == "Person") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
+                                                isSmall = true, isCompact = alertSize == "small",
+                                            )
+                                        }
                                     }
                                 }
                             }
